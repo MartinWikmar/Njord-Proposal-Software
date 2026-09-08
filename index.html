@@ -372,7 +372,7 @@ function docsTemplate(){return DOCS.template||builtinTemplate();}
 const DOCS={files:new Map(),template:null,root:'',count:0,handle:null,name:'',tenders:new Map(),sheets:[],lastNo:0,tendersRoot:''};
 const TENDER_DIR=/^(20\d\d\d{3})_/;
 function docsLoad(list,rootName){
-  let nDocs=0,root='';const T=new Map();const sheets=[];
+  GEN.skipDocs=false;let nDocs=0,root='';const T=new Map();const sheets=[];
   for(const it of list){const f=it.file||it;let rel=it.path?it.path.split('/'):(f.webkitRelativePath||f.name).split('/');
     if(!it.path&&rel.length>1){root=rel[0];rel.shift();}
     if(rel.some(seg=>seg.startsWith('.')||seg==='node_modules'||/^~\$/.test(seg)))continue;
@@ -667,18 +667,22 @@ async function buildPackage(proposalPdfBytes,S_,tenderNo,log){
 }
 
 /* ---------- orchestration ---------- */
-const GEN={busy:false,files:[],log:[],error:'',pending:false,ownPdf:null};
+const GEN={busy:false,files:[],log:[],error:'',pending:false,ownPdf:null,skipDocs:false,nApp:0};
 function genLog(msg,replace){if(replace&&GEN.log.length&&/^(Rendered page|Bound )/.test(GEN.log[GEN.log.length-1]))GEN.log[GEN.log.length-1]=msg;else GEN.log.push(msg);const el=document.getElementById('genlog');if(el){el.innerHTML=GEN.log.map(l=>`<div>${esc(l)}</div>`).join('');el.scrollTop=el.scrollHeight;}}
 function tenderExport(){const c=calc();const {blocks,spreads,...rest}=c;return {state:JSON.parse(JSON.stringify(S)),calc:{...rest,blocks:blocks.map(x=>({name:x.b.name,...x.c,input:x.b,spread:spreadOf(x.b).id})),spreads:spreads.map(x=>({...x,blocks:x.blocks.map(y=>y.b.name),alts:x.alts.map(a=>({id:a.id,name:a.V.name,kind:a.V.kind,crew:a.V.crew,rateOp:a.rateOp,rateWx:a.rateWx,field:a.field,delta:a.delta}))}))}};}
 /* the Generate button: find the documents folder (remembered, or ask once), then build */
 async function genStart(ownPdfFile){
   if(GEN.busy)return;
   if(ownPdfFile)GEN.ownPdf=ownPdfFile;
-  if(!docsTemplate()&&!window.showDirectoryPicker){GEN.pending=true;toast('Choose the 2 Tender or Mall 2026 folder – the package is built as soon as it is chosen');docsPickInput();return;}
-  if(!DOCS.template&&!DOCS.count&&window.showDirectoryPicker){if(await docsRestore()){render();}}
-  if(!docsTemplate()){GEN.pending=true;toast('Choose the 2 Tender or Mall 2026 folder once – the package is built as soon as it is chosen');const ok=await docsPick();render();if(ok&&docsTemplate()){GEN.pending=false;generatePackage(GEN.ownPdf);}else if(ok)toast('The Small Proposal template (xxxxxxx_Client_Small Proposal.docx) was not found in that folder');return;}
+  const st=docsStatus();const needDocs=st.want>0&&!st.found&&!DOCS.count&&!GEN.skipDocs; /* appendices ticked but no folder yet */
+  if(needDocs&&!window.showDirectoryPicker){GEN.pending=true;toast('Choose the Mall 2026 folder so the ticked appendices go into the package – or cancel to build without them');if(!docsPickInput()){GEN.pending=false;generatePackage(GEN.ownPdf);}return;}
+  if(needDocs){if(await docsRestore()){render();}}
+  if(needDocs&&!DOCS.count){GEN.pending=true;toast('Choose the Mall 2026 folder so the ticked appendices go into the package – or cancel to build without them');const ok=await docsPick();render();GEN.pending=false;if(!ok)GEN.skipDocs=true;generatePackage(GEN.ownPdf);return;}
+  if(!docsTemplate()){GEN.pending=true;toast('Choose the Mall 2026 folder – the template is needed');if(!window.showDirectoryPicker){docsPickInput();return;}const ok=await docsPick();render();if(ok&&docsTemplate()){GEN.pending=false;generatePackage(GEN.ownPdf);}return;}
   generatePackage(GEN.ownPdf);
 }
+/* the folder dialog was cancelled: build without appendices rather than doing nothing */
+document.addEventListener('cancel',e=>{const el=e.target;if(el&&(el.id==='mallfolder'||el.id==='mallfolder2')&&GEN.pending){GEN.pending=false;GEN.skipDocs=true;toast('Building without appendices – choose the folder later and generate again to bind them in');generatePackage(GEN.ownPdf);}},true);
 function browserTag(){const u=navigator.userAgent||'';const m=u.match(/(Edg|Chrome|Firefox|Version)\/(\d+)/);const safari=/Safari/.test(u)&&!/Chrome|Edg/.test(u);return (safari?'Safari ':m?m[1]+' ':'')+(m?m[2]:'')+(/iPhone|iPad/.test(u)?' iOS':/Macintosh/.test(u)?' macOS':/Windows/.test(u)?' Windows':'');}
 async function generatePackage(ownPdfFile){
   if(GEN.busy)return;const tpl=docsTemplate();if(!tpl){toast('Choose the Mall 2026 folder first – the Small Proposal template is needed');return;}
@@ -696,7 +700,7 @@ async function generatePackage(ownPdfFile){
     const pk=await buildPackage(pdfBytes,T.state,tenderNo,genLog);
     GEN.nApp=pk.nApp;GEN.pages=pk.pages;GEN.files.push({name:headerCode+'_Tender_Package.pdf',blob:new Blob([pk.bytes],{type:'application/pdf'}),kind:`Complete tender package – proposal + ${pk.nApp} appendix document${pk.nApp===1?'':'s'}, ${pk.pages} pages`,main:true});
     GEN.files.push({name:tenderNo+'_tender_data.json',blob:new Blob([JSON.stringify(T)],{type:'application/json'}),kind:'Tender data – keep in the tender\'s Work folder'});
-    if(pk.missing.length)genLog('Not found in the folder: '+pk.missing.join(', '));
+    if(pk.missing.length){if(!DOCS.count)genLog('NO APPENDICES IN THE PACKAGE – the appendix PDFs are in OneDrive › 2 Tender › Mall 2026 and this page has not been given that folder yet. Press "Choose the 2 Tender folder" (or Mall 2026), then Generate package again.');else genLog('Not found in the chosen folder: '+pk.missing.join(', '));}
     /* the tender folder structure: Tender/ (what goes to the client) and Work/ (tender data) */
     const year=new Date().getFullYear();const folderName=S.itt.tenderFolder||`${tenderNo}_${(S.clientShort||'Client').replace(/\s+/g,'_')}_${(S.jobShort||'Job').replace(/\s+/g,'_')}`;
     try{await loadLib('jszip');const z=new JSZip();const tf=z.folder('Tender'),wf=z.folder('Work');for(const f of GEN.files){if(/_tender_data\.json$/.test(f.name))wf.file(f.name,f.blob);else tf.file(f.name,f.blob);}
