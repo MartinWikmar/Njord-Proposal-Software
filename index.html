@@ -396,9 +396,10 @@ function idbKV(op,key,val){return new Promise((res,rej)=>{try{const r=indexedDB.
   r.onsuccess=()=>{const db=r.result;const tx=db.transaction('kv',op==='get'?'readonly':'readwrite');const st=tx.objectStore('kv');const q=op==='get'?st.get(key):st.put(val,key);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);};}catch(e){rej(e);}});}
 /* remembered folder (Chrome/Edge, page opened directly): one permission click instead of browsing to the folder every time */
 async function docsRestore(){try{const h=await idbKV('get','mall');if(!h)return false;let p=await h.queryPermission({mode:'read'});if(p!=='granted')p=await h.requestPermission({mode:'read'});if(p!=='granted')return false;await docsUseHandle(h);return !!DOCS.template;}catch(e){return false;}}
+function docsPickInput(){const inp=document.getElementById('mallfolder')||document.getElementById('mallfolder2');if(inp){inp.click();return true;}return false;}
 async function docsPick(which){
   if(window.showDirectoryPicker){try{const h=await showDirectoryPicker({id:which||'mall2026',mode:'read'});await docsUseHandle(h);try{await idbKV('put','mall',h);}catch(e){}return true;}catch(e){if(e&&e.name==='AbortError')return false;}}
-  const inp=document.getElementById('mallfolder')||document.getElementById('mallfolder2');if(inp)inp.click();return false;
+  docsPickInput();return false;
 }
 /* the next tender number: the highest this-year number among the tender folders and the tender list spreadsheet, plus one */
 async function sheetNumbers(file,year){try{await loadLib('jszip');const z=await JSZip.loadAsync(file);const nums=new Set();const re=new RegExp('\\b'+year+'\\d{3}\\b','g');
@@ -420,7 +421,8 @@ function docsTenderList(){return [...DOCS.tenders.values()].sort((a,b)=>b.no-a.n
 function docsMatch(path){
   if(path.includes('*')){const dir=path.slice(0,path.lastIndexOf('/')+1);const ext=path.slice(path.lastIndexOf('.')).toLowerCase();
     return [...DOCS.files.keys()].filter(k=>k.startsWith(dir)&&k.slice(dir.length).indexOf('/')<0&&k.toLowerCase().endsWith(ext)).sort().map(k=>DOCS.files.get(k));}
-  const f=DOCS.files.get(path);return f?[f]:[];
+  const f=DOCS.files.get(path);if(f)return [f];
+  const base=path.split('/').pop().toLowerCase();const k=[...DOCS.files.keys()].find(x=>x.split('/').pop().toLowerCase()===base);return k?[DOCS.files.get(k)]:[];
 }
 function docsStatus(){
   const nT=DOCS.tenders.size;const tTxt=nT?` · ${nT} tender folders${DOCS.lastNo?', latest '+DOCS.lastNo:''}`:'';
@@ -663,10 +665,12 @@ function tenderExport(){const c=calc();const {blocks,spreads,...rest}=c;return {
 async function genStart(ownPdfFile){
   if(GEN.busy)return;
   if(ownPdfFile)GEN.ownPdf=ownPdfFile;
+  if(!DOCS.template&&!window.showDirectoryPicker){GEN.pending=true;toast('Choose the 2 Tender or Mall 2026 folder – the package is built as soon as it is chosen');docsPickInput();return;}
   if(!DOCS.template){if(await docsRestore()){render();}}
-  if(!DOCS.template){GEN.pending=true;toast('Choose the Mall 2026 folder once – the package is built as soon as it is chosen');const ok=await docsPick();render();if(ok&&DOCS.template){GEN.pending=false;generatePackage(GEN.ownPdf);}else if(ok)toast('The Small Proposal template (xxxxxxx_Client_Small Proposal.docx) was not found in that folder');return;}
+  if(!DOCS.template){GEN.pending=true;toast('Choose the 2 Tender or Mall 2026 folder once – the package is built as soon as it is chosen');const ok=await docsPick();render();if(ok&&DOCS.template){GEN.pending=false;generatePackage(GEN.ownPdf);}else if(ok)toast('The Small Proposal template (xxxxxxx_Client_Small Proposal.docx) was not found in that folder');return;}
   generatePackage(GEN.ownPdf);
 }
+function browserTag(){const u=navigator.userAgent||'';const m=u.match(/(Edg|Chrome|Firefox|Version)\/(\d+)/);const safari=/Safari/.test(u)&&!/Chrome|Edg/.test(u);return (safari?'Safari ':m?m[1]+' ':'')+(m?m[2]:'')+(/iPhone|iPad/.test(u)?' iOS':/Macintosh/.test(u)?' macOS':/Windows/.test(u)?' Windows':'');}
 async function generatePackage(ownPdfFile){
   if(GEN.busy)return;if(!DOCS.template){toast('Choose the Mall 2026 folder first – the Small Proposal template is needed');return;}
   GEN.busy=true;GEN.files=[];GEN.log=[];GEN.error='';render();
@@ -684,7 +688,7 @@ async function generatePackage(ownPdfFile){
     GEN.files.push({name:tenderNo+'_tender_data.json',blob:new Blob([JSON.stringify(T)],{type:'application/json'}),kind:'Tender data – keep in the tender\'s Work folder'});
     if(pk.missing.length)genLog('Not found in the folder: '+pk.missing.join(', '));
     genLog('Done – save the files below');
-  }catch(e){GEN.error=String(e&&e.message||e);genLog('Failed: '+GEN.error);console.error(e);}
+  }catch(e){GEN.error=String(e&&e.message||e);genLog('Failed: '+GEN.error+' ('+browserTag()+(e&&e.stack?' · '+String(e.stack).split('\n').slice(0,2).join(' ').slice(0,160):'')+')');console.error(e);}
   GEN.busy=false;GEN.ownPdf=null;render();
 }
 let DL=null;
@@ -704,9 +708,12 @@ function vGenerate(){
     <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn primary" data-act="gen-run" ${busy?'disabled':''}>${busy?'Working…':'Generate package'}</button>
       <button class="btn" data-act="docs-pick">${DOCS.count?'Change documents folder':'Choose the 2 Tender folder'}</button><input id="mallfolder" type="file" webkitdirectory multiple hidden>
+      <label class="btn sm" for="malltpl" title="If the folder picker does not work in your browser: choose the template file itself, then add the appendix PDFs">${DOCS.template?'Template ✓':'…or choose the template file'}<input id="malltpl" type="file" accept=".docx" hidden></label>
+      <label class="btn sm" for="mallpdfs" title="Add appendix PDFs one by one or many at once">+ Appendix PDFs<input id="mallpdfs" type="file" accept=".pdf" multiple hidden></label>
       <label class="btn sm" for="ownpdf" title="Bind the package around a PDF you saved from Word instead of the page's own rendering">Bind with my own PDF of the proposal<input id="ownpdf" type="file" accept="application/pdf" hidden></label>
       <button class="btn sm" data-act="json-copy">Copy tender data (JSON)</button>
     </div>
+    ${st.ok?'':`<div class="hint" style="font-size:12px;color:var(--ink-3);margin-top:10px"><b>First choose the documents</b> – the 2 Tender folder (or Mall 2026) with "Choose the 2 Tender folder", then press Generate package. If the folder picker gives nothing in your browser, choose the template file (Mall 2026 › Work › xxxxxxx_Client_Small Proposal.docx) with "…or choose the template file" and add the appendix PDFs with "+ Appendix PDFs".</div>`}
     ${GEN.log.length?`<div class="formula" id="genlog" style="margin-top:12px;white-space:normal;max-height:150px;overflow:auto">${GEN.log.map(l=>`<div>${esc(l)}</div>`).join('')}</div>`:''}
     ${GEN.files.length?`<div class="tblwrap" style="margin-top:12px"><table><thead><tr><th>File</th><th>What</th><th class="r">Size</th><th style="width:110px"><button class="btn sea sm" data-act="gen-save-all">Save all</button></th></tr></thead><tbody>${GEN.files.map((f,i)=>`<tr><td class="num" style="font-size:12px">${esc(f.name)}</td><td style="font-size:13px">${esc(f.kind)}</td><td class="r num">${(f.blob.size/1e6).toFixed(1)} MB</td><td class="acts"><button class="btn sea sm" data-act="gen-save" data-i="${i}">Save</button></td></tr>`).join('')}</tbody></table></div>
     <div class="hint" style="font-size:12px;color:var(--ink-3);margin-top:8px">Save the Word file and the tender data in the tender's Tender and Work folders, the package PDF is what goes to the client. The PDF is rendered by the program in the Njord look; for the exact Word layout, open the Word file, Save as PDF and press "Bind with my own PDF" – the package is rebuilt around it. Open the Word file and accept "update fields" so the contents and figure lists refresh.</div>`:''}
@@ -2624,6 +2631,7 @@ document.addEventListener('change',e=>{
   if(el.id==='tplfile'){const f=el.files&&el.files[0];if(f){const old=JSON.stringify(S.rates.templates.length);S.rates.templates.push({id:'t'+Date.now(),name:f.name.replace(/\.[^.]+$/,''),file:f.name,folder:'Mall 2026/Work',use:'',owner:S.user||'',updated:new Date().toISOString().slice(0,10)});S.rateLog.push({t:new Date().toISOString(),path:'rates.templates',label:'Template added · '+f.name+' ('+Math.round(f.size/1024)+' kB)',old:'',new:f.name,who:S.user||ROLES[S.role].label});toast('Template registered – now save the file in Mall 2026');}el.value='';render();return;}
   if(el.id==='mallfolder'||el.id==='mallfolder2'){const n=docsLoad([...el.files]);el.value='';render();docsTenderNo().then(next=>{render();if(GEN.pending&&DOCS.template){GEN.pending=false;generatePackage(GEN.ownPdf);return;}toast(docsToast(n,next));});return;}
   if(el.id==='ownpdf'){const f=el.files&&el.files[0];el.value='';if(f)genStart(f);return;}
+  if(el.id==='malltpl'||el.id==='mallpdfs'){const fl=[...el.files];el.value='';if(!fl.length)return;const n=docsLoad(fl);render();if(GEN.pending&&DOCS.template){GEN.pending=false;generatePackage(GEN.ownPdf);return;}toast(el.id==='malltpl'?(DOCS.template?'Template ready – now press Generate package':'That file is not the Small Proposal template'):fl.length+' appendix PDF'+(fl.length>1?'s':'')+' added – '+docsStatus().text);return;}
   if(el.id==='ittfiles'||el.id==='ittfiles2'||el.id==='ittfiles3'){const fl=[...el.files];ittAttach(fl);el.value='';return;}
   if(el.dataset.path){
     if(/^spreads\.\d+\.crewChanges$/.test(el.dataset.path)&&el.value===''){S.spreads[+el.dataset.path.split('.')[1]].crewChanges=null;render();}
