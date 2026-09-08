@@ -435,7 +435,7 @@ const WNS='http://schemas.openxmlformats.org/wordprocessingml/2006/main', XMLNS=
 const EQUIP_LONG={mbes:'Multibeam echosounder',sss:'Side scan sonar',sbp:'Sub-bottom profiler',mag:'Magnetometer',rov:'ROV',gaps:'USBL positioning'};
 const SHORT={mbes:'MBES',sss:'SSS',sbp:'SBP',mag:'MAG',rov:'ROV',gaps:'USBL'};
 const joinand=xs=>{xs=xs.filter(Boolean);return xs.length?xs.length===1?xs[0]:xs.slice(0,-1).join(', ')+' and '+xs[xs.length-1]:'';};
-const sentences=t=>String(t||'').split(/;|\n|(?<=\.)\s+(?=[A-Z])/).map(x=>x.replace(/^[\s.]+|[\s.]+$/g,'')).filter(Boolean);
+const sentences=t=>String(t||'').replace(/\.\s+(?=[A-Z])/g,'.\u0001').split(/;|\n|\u0001/).map(x=>x.replace(/^[\s.]+|[\s.]+$/g,'')).filter(Boolean);
 const D1=n=>(Math.round((n||0)*10)/10).toFixed(1).replace('.',',');
 const D0=n=>String(Math.round(n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
 function money(n,cur,fx){const v=cur!=='SEK'?n/((fx&&fx[cur])||1):n;return cur+' '+String(Math.round(v/100)*100).replace(/\B(?=(\d{3})+(?!\d))/g,' ');}
@@ -913,21 +913,37 @@ async function renderProposalPdf(zip,doc,meta,log){
 }
 /* ---------- ITT intake: read the dropped invitation, fill the tender from it ---------- */
 const ITT={busy:false,status:'',error:''};
-const PDFJS_URLS=['https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/legacy/build/pdf.min.mjs','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs','https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.mjs'];
-async function pdfjsLoad(){
+/* pdf.js candidates, most compatible first; if one fails at load or at use (older Safari), the next is tried */
+const PDFJS_CANDS=[{esm:'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.mjs'},{umd:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'},{umd:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js'},{esm:'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/legacy/build/pdf.min.mjs'}];
+let PDFJS_IDX=0;
+function loadScript(url){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=url;s.onload=()=>res();s.onerror=()=>rej(new Error('could not load '+url));document.head.appendChild(s);});}
+async function pdfjsLoad(next){
+  if(next){window.__pdfjs=null;PDFJS_IDX++;}
   if(window.__pdfjs&&typeof window.__pdfjs.getDocument==='function')return window.__pdfjs;
-  const cands=(window.NJORD_LIBS&&window.NJORD_LIBS.pdfjs)?[window.NJORD_LIBS.pdfjs]:PDFJS_URLS;let last=null;
-  for(const u of cands){try{const m=await import(/* webpackIgnore: true */u);m.GlobalWorkerOptions.workerSrc=u.replace(/pdf\.min\.mjs$/,'pdf.worker.min.mjs');window.__pdfjs=m;return m;}catch(e){last=e;}}
+  const ov=window.NJORD_LIBS&&window.NJORD_LIBS.pdfjs;const cands=ov?(Array.isArray(ov)?ov:[{esm:ov}]):PDFJS_CANDS;let last=null;
+  for(;PDFJS_IDX<cands.length;PDFJS_IDX++){const c=cands[PDFJS_IDX];
+    try{let m;
+      if(c.esm){m=await import(/* webpackIgnore: true */c.esm);m.GlobalWorkerOptions.workerSrc=c.esm.replace(/pdf\.min\.mjs$/,'pdf.worker.min.mjs');}
+      else{await loadScript(c.umd);m=window.pdfjsLib;if(!m||typeof m.getDocument!=='function')throw new Error('pdfjsLib missing');m.GlobalWorkerOptions.workerSrc=c.umd.replace(/pdf\.min\.js$/,'pdf.worker.min.js');}
+      window.__pdfjs=m;return m;
+    }catch(e){last=e;}}
   throw new Error('pdf.js could not be loaded'+(last?' – '+(last.message||last):''));
+}
+async function pdfExtract(lib,bytes,cap){
+  const doc=await lib.getDocument({data:bytes,isEvalSupported:false,disableFontFace:true}).promise;let out='';const N=Math.min(doc.numPages,80);
+  for(let i=1;i<=N;i++){const pg=await doc.getPage(i);const tc=await pg.getTextContent();let line='',lastY=null;
+    for(const it of tc.items){if(it.str==null)continue;const y=it.transform?it.transform[5]:null;if(lastY!==null&&y!==null&&Math.abs(y-lastY)>2.5){out+=line.replace(/\s+$/,'')+'\n';line='';}line+=it.str+(it.hasEOL?'\n':' ');lastY=y;}
+    out+=line+'\n';if(out.length>cap)break;}
+  try{doc.destroy();}catch(e){}return out;
 }
 const xmlUnesc=s=>s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,(m,c)=>String.fromCharCode(+c));
 async function fileText(f,cap){
   const n=f.name.toLowerCase();cap=cap||120000;
-  if(n.endsWith('.pdf')){const lib=await pdfjsLoad();const doc=await lib.getDocument({data:new Uint8Array(await f.arrayBuffer()),isEvalSupported:false,disableFontFace:true}).promise;let out='';const N=Math.min(doc.numPages,80);
-    for(let i=1;i<=N;i++){const pg=await doc.getPage(i);const tc=await pg.getTextContent();let line='',lastY=null;
-      for(const it of tc.items){if(it.str==null)continue;const y=it.transform?it.transform[5]:null;if(lastY!==null&&y!==null&&Math.abs(y-lastY)>2.5){out+=line.replace(/\s+$/,'')+'\n';line='';}line+=it.str+(it.hasEOL?'\n':' ');lastY=y;}
-      out+=line+'\n';if(out.length>cap)break;}
-    try{doc.destroy();}catch(e){}return out;}
+  if(n.endsWith('.pdf')){const buf=await f.arrayBuffer();let lastErr=null;
+    for(let attempt=0;attempt<PDFJS_CANDS.length;attempt++){if(attempt&&ITT.status){ITT.status='Trying another PDF reader…';const el=document.getElementById('ittstatus');if(el)el.textContent=ITT.status;}let lib;try{lib=await pdfjsLoad(attempt>0);}catch(e){throw lastErr||e;}
+      try{return await pdfExtract(lib,new Uint8Array(buf.slice(0)),cap);}
+      catch(e){lastErr=e;const msg=String(e&&e.message||e);if(!(e instanceof TypeError||e instanceof ReferenceError||/not a function|not defined|not iterable|is not an object|withResolvers|undefined is not|null is not/i.test(msg)))throw e;}}
+    throw lastErr||new Error('PDF could not be read');}
   if(n.endsWith('.docx')){await loadLib('jszip');const z=await JSZip.loadAsync(f);const d=z.file('word/document.xml');if(!d)return '';const x=await d.async('string');return xmlUnesc(x.replace(/<\/w:p>/g,'\n').replace(/<w:tab\/>/g,'\t').replace(/<w:br[^>]*\/>/g,'\n').replace(/<[^>]+>/g,'')).slice(0,cap);}
   if(n.endsWith('.xlsx')){await loadLib('jszip');const z=await JSZip.loadAsync(f);const ss=z.file('xl/sharedStrings.xml');if(!ss)return '';const x=await ss.async('string');return xmlUnesc(x.replace(/<\/si>/g,'\n').replace(/<[^>]+>/g,'')).slice(0,cap);}
   if(/\.(txt|md|csv|rtf|htm|html|xml|kml)$/.test(n)){const t=await f.text();return (n.endsWith('.htm')||n.endsWith('.html')?t.replace(/<[^>]+>/g,' '):t).slice(0,cap);}
@@ -990,13 +1006,13 @@ async function ittAnalyse(){
 function ittHeuristics(text){
   const t=String(text||'');const low=t.toLowerCase();const r={};
   const head=t.slice(0,6000);
-  const cos={};for(const m of head.matchAll(/\b([A-ZÅÄÖ][\wÅÄÖåäö&.'’-]+(?:[ \t][A-ZÅÄÖ][\wÅÄÖåäö&.'’-]+){0,3})[ \t]+(AB|Ltd\.?|Limited|plc|PLC|GmbH|A\/S|ApS|ASA|AS|Oy|Oyj|B\.?V\.?|N\.?V\.?|S\.?A\.?|SpA|S\.p\.A\.|Sp\. z o\.o\.|Inc\.?|LLC)\b/g)){const name=(m[1]+' '+m[2]).trim();if(/njord|clinton/i.test(name))continue;cos[name]=(cos[name]||0)+1;}
+  const cos={};for(const seg of head.replace(/([.!?:;])\s+/g,'$1\u0001').split(/\u0001|\n+/))for(const m of seg.matchAll(/\b([A-ZÅÄÖ][\wÅÄÖåäö&.'’-]+(?:[ \t][A-ZÅÄÖ][\wÅÄÖåäö&.'’-]+){0,3})[ \t]+(AB|Ltd\.?|Limited|plc|PLC|GmbH|A\/S|ApS|ASA|AS|Oy|Oyj|B\.?V\.?|N\.?V\.?|S\.?A\.?|SpA|S\.p\.A\.|Sp\. z o\.o\.|Inc\.?|LLC)\b/g)){const name=(m[1]+' '+m[2]).trim();if(/njord|clinton/i.test(name))continue;cos[name]=(cos[name]||0)+1;}
   const best=Object.entries(cos).sort((a,b)=>b[1]-a[1])[0];if(best){r.client=best[0];r.clientShort=best[0].split(/\s+/)[0].replace(/[^\w]/g,'');}
   const KNOWN=['Ørsted','Orsted','Vattenfall','RWE','TenneT','Equinor','Nexans','Statkraft','Skyborn','DEME','Van Oord','Boskalis','Iberdrola','ScottishPower','EnBW','Amprion','50Hertz','Energinet','Elia','Svenska kraftnät','Trafikverket','Sjöfartsverket','Fortum','Eneco','TotalEnergies','Repsol','Saipem','Subsea7','Prysmian','NKT','Siemens Gamesa','Vestas','Hexicon','OX2','Eolus','Ilmatar','Baltic Power','Northland','Parkwind','Corio','Copenhagen Infrastructure','Ocean Winds','Wintershall','Harbour Energy','Gassco','Havfram','Tyréns','Sweco','Ramboll','AFRY','Cowi','NIRAS','Femern','Peel Ports','Forth Ports','Port of Gothenburg','Göteborgs Hamn','Stockholms Hamnar','Maritime and Coastguard Agency','Associated British Ports'];
   const folderClients=[...(typeof DOCS!=='undefined'&&DOCS.tenders?DOCS.tenders.values():[])].map(t=>(t.name.split('_')[1]||'').trim()).filter(x=>x.length>2);
   const dict=[...new Set([...folderClients,...KNOWN])];const hits=dict.map(k=>({k,n:(t.slice(0,60000).match(new RegExp('\\b'+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'))||[]).length})).filter(x=>x.n).sort((a,b)=>b.n-a.n);
   if(hits.length&&(!best||hits[0].n>=best[1])){const k=hits[0].k;if(!r.client||!new RegExp(k,'i').test(r.client))r.client=k;r.clientShort=k.replace(/[^\w]/g,'');}
-  const sent=t.split(/(?<=[.!?])\s+|\n+/).map(x=>x.toLowerCase());const neg=x=>/\bnot\b|\bno\b|exclud|without|optional|n\/a/.test(x);
+  const sent=t.replace(/([.!?])\s+/g,'$1\u0001').split(/\u0001|\n+/).map(x=>x.toLowerCase());const neg=x=>/\bnot\b|\bno\b|exclud|without|optional|n\/a/.test(x);
   const cnt=re=>sent.reduce((a,x)=>a+(re.test(x)&&!neg(x)?1:0),0);
   const JT={cable:cnt(/cable route|export cable|cable corridor|inter-?array|interconnector|landfall|cable/),owf:cnt(/wind farm|windfarm|\bowf\b|site investigation|geophysical site|foundation/),uxo:cnt(/\buxo\b|unexploded|gradiometer/),asbuilt:cnt(/as-?built|post-?lay|depth of burial|\bdob\b|burial/),inspect:cnt(/\brov\b|inspection|free ?span|pipeline/),port:cnt(/\bport\b|harbou?r|fairway|channel|dredg|berth|quay/),env:cnt(/habitat|environmental|benthic|eelgrass|seagrass/),hydro:cnt(/bathymetr|chart|hydrograph|s-44|special order/)};
   const bestJT=Object.entries(JT).sort((a,b)=>b[1]-a[1])[0];r.jobType=bestJT&&bestJT[1]?bestJT[0]:(guessRecipe(t)||null);
@@ -1016,7 +1032,7 @@ function ittHeuristics(text){
   const am=t.match(/(\d{1,4}(?:[.,]\d+)?)\s*(?:km²|km2|sq\.? ?km|square kilomet)/i);const km=t.match(/(\d{1,4}(?:[.,]\d+)?)\s*(?:km|kilomet)\b[^.\n]{0,40}(?:corridor|route|cable|length)/i)||t.match(/(?:corridor|route|cable)[^.\n]{0,40}?(\d{1,4}(?:[.,]\d+)?)\s*km\b/i);const wm=t.match(/(\d{2,4})\s*(?:m|metre|meter)s?\s*(?:wide|width)|width\s*(?:of\s*)?(\d{2,4})\s*m/i);const lk=t.match(/(\d{2,6}(?:[.,]\d+)?)\s*(?:line\s*km|line kilomet)/i);
   r.size={area_km2:am?parseFloat(am[1].replace(',','.')):null,corridor_km:km?parseFloat(km[1].replace(',','.')):null,corridor_width_m:wm?+(wm[1]||wm[2]):null,line_km:lk?parseFloat(lk[1].replace(',','.')):null};
   r.scoring=/technical (?:score|scoring|evaluation|criteria)|award criteria|weighting|weighted/i.test(t);
-  const sentO=t.replace(/\s+/g,' ').split(/(?<=[.!?])\s+(?=[A-Z(])/).map(x=>x.trim()).filter(x=>x.length>15);
+  const sentO=t.replace(/\s+/g,' ').replace(/([.!?])\s+(?=[A-Z(])/g,'$1\u0001').split('\u0001').map(x=>x.trim()).filter(x=>x.length>15);
   /* datums */
   const hz=near(/horizontal datum|coordinate (?:reference )?system|projection|grid system|geodetic/,240)||t;
   const hm=hz.match(/\b(ETRS ?89|WGS ?84|SWEREF ?99(?:\s?\d{2}\s?\d{2}|\s?TM)?|EUREF ?89|ED ?50|OSGB ?36|RD ?New|ITRF\d*|GDA ?2020)\b(?:[^.\n]{0,40}?(UTM\s*(?:zone\s*)?\d{1,2}\s?[NS]?|TM\d*|British National Grid|BNG|LAEA|LCC))?/i)||t.match(/\b(UTM\s*(?:zone\s*)?\d{1,2}\s?[NS]?)\b/i)||t.match(/\bEPSG:?\s?\d{4,5}\b/i);
@@ -1656,6 +1672,7 @@ function vITT(c){
     <label class="drop" for="ittfiles2" data-drop="itt"><b>Drop the ITT here</b><br>PDF, DOCX, XLSX, text – click to choose files, <a href="#" data-act="itt-folder" style="color:var(--sea)">or attach the whole ITT folder</a><input id="ittfiles2" type="file" multiple hidden><input id="ittfiles" type="file" multiple webkitdirectory hidden></label>
     ${f.files.length?`<ul class="filelist" style="margin-top:14px">${f.files.map((x,i)=>`<li><span class="ftype">${esc(x.ext)}</span><span>${esc(x.name)}<span style="color:var(--ink-3)"> · ${x.size}</span></span><button class="btn x" data-act="itt-rm" data-i="${i}">✕</button></li>`).join('')}</ul><div class="row" style="margin-top:8px"><button class="btn sm x" data-act="itt-clear">Remove all</button></div>`:''}
     ${vIttRead()}
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--ink-3)">…or paste the text of the ITT (when a PDF cannot be read here – copy it from Acrobat or Preview)</summary><textarea data-path="ui.ittPaste" style="min-height:90px;margin-top:8px" placeholder="Paste the ITT text here">${esc(S.ui.ittPaste||'')}</textarea><div class="row" style="margin-top:8px"><button class="btn sea sm" data-act="itt-paste">Read the pasted text</button></div></details>
   </div>
   <div class="panel">
     <div class="panel-h"><div><h2>Tender number and folder</h2><p>The number is the sales case number from Severa. When the Severa link is live the field fills itself when the case is created; until then the tool suggests the last folder + 1 and you type the Severa number over it.</p></div><span class="badge info">Next free: ${S.rates.nextTenderNo}</span></div>
@@ -2452,6 +2469,7 @@ document.addEventListener('click',e=>{
     'dev-rm':()=>S.pkg.deviations.splice(i,1),
     'itt-clear':()=>{S.itt.files=[];S.itt.text='';S.itt.textFiles=[];S.itt.read=null;},
     'itt-read':()=>{ittAnalyse();},
+    'itt-paste':()=>{const t=String(S.ui.ittPaste||'').trim();if(t.length<40){toast('Paste the ITT text first');return;}S.itt.mode='itt';S.itt.text=t.slice(0,400000);S.itt.textFiles=['pasted text'];if(!S.itt.files.some(x=>x.name==='Pasted ITT text'))S.itt.files.push({name:'Pasted ITT text',ext:'TXT',size:Math.round(t.length/1e3)+' k chars'});S.ui.ittPaste='';ittAnalyse();},
     'itt-folder':()=>{const inp=document.getElementById('ittfiles');if(inp)inp.click();},
     'base-folder':()=>{const t=DOCS.tenders.get(b.dataset.key);const f=t&&t.datas[+b.dataset.i||0];if(!f)return;f.text().then(txt=>{const j=JSON.parse(txt);const stt=j.state||j;if(!stt||!stt.blocks)throw new Error('no state');useAsBase(stt,{no:String(stt.tenderNo||t.no),name:stt.name||t.name,label:(stt.rev&&stt.rev.label)||'tender data'});render();toast('Based on '+t.name);}).catch(e=>toast('Could not read '+f.name));},
     'itt-rm':()=>S.itt.files.splice(i,1),
