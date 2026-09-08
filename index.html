@@ -911,6 +911,89 @@ async function renderProposalPdf(zip,doc,meta,log){
   log&&log(`PDF rendered – ${pages.length} pages`);
   return {bytes:await pdf.save(),pages:pages.length};
 }
+/* ---------- built-in PDF text extraction with pdf-lib (no network, works in every browser) ----------
+   Good for text PDFs from Word/Acrobat (WinAnsi TrueType/Type1 fonts, Identity-H fonts with ToUnicode). Scanned PDFs give nothing. */
+const WINANSI_HI={0x80:'€',0x82:'‚',0x83:'ƒ',0x84:'„',0x85:'…',0x86:'†',0x87:'‡',0x88:'ˆ',0x89:'‰',0x8A:'Š',0x8B:'‹',0x8C:'Œ',0x8E:'Ž',0x91:'‘',0x92:'’',0x93:'“',0x94:'”',0x95:'•',0x96:'–',0x97:'—',0x98:'˜',0x99:'™',0x9A:'š',0x9B:'›',0x9C:'œ',0x9E:'ž',0x9F:'Ÿ'};
+const GLYPHS={space:' ',exclam:'!',quotedbl:'"',numbersign:'#',dollar:'$',percent:'%',ampersand:'&',quotesingle:"'",quoteright:'’',quoteleft:'‘',quotedblleft:'“',quotedblright:'”',quotedblbase:'„',quotesinglbase:'‚',parenleft:'(',parenright:')',asterisk:'*',plus:'+',comma:',',hyphen:'-',minus:'−',period:'.',slash:'/',colon:':',semicolon:';',less:'<',equal:'=',greater:'>',question:'?',at:'@',bracketleft:'[',backslash:'\\',bracketright:']',asciicircum:'^',underscore:'_',grave:'`',braceleft:'{',bar:'|',braceright:'}',asciitilde:'~',bullet:'•',endash:'–',emdash:'—',ellipsis:'…',degree:'°',plusminus:'±',multiply:'×',divide:'÷',section:'§',paragraph:'¶',copyright:'©',registered:'®',trademark:'™',Euro:'€',sterling:'£',yen:'¥',cent:'¢',currency:'¤',periodcentered:'·',guillemotleft:'«',guillemotright:'»',fi:'fi',fl:'fl',ff:'ff',ffi:'ffi',ffl:'ffl',dagger:'†',daggerdbl:'‡',onehalf:'½',onequarter:'¼',threequarters:'¾',twosuperior:'²',threesuperior:'³',onesuperior:'¹',mu:'µ',Aring:'Å',aring:'å',Adieresis:'Ä',adieresis:'ä',Odieresis:'Ö',odieresis:'ö',Oslash:'Ø',oslash:'ø',AE:'Æ',ae:'æ',Eacute:'É',eacute:'é',egrave:'è',agrave:'à',aacute:'á',ccedilla:'ç',ntilde:'ñ',udieresis:'ü',Udieresis:'Ü',germandbls:'ß',nbspace:' ',zero:'0',one:'1',two:'2',three:'3',four:'4',five:'5',six:'6',seven:'7',eight:'8',nine:'9'};
+function pdfLatin(code){if(code>=0x80&&code<=0x9F)return WINANSI_HI[code]||'';if(code>=32)return String.fromCharCode(code);return code===9||code===10||code===13?' ':'';}
+function pdfHexBytes(h){const s=h.replace(/[^0-9A-Fa-f]/g,'');const out=[];for(let i=0;i<s.length;i+=2)out.push(parseInt(s.substr(i,2).padEnd(2,'0'),16));return out;}
+function pdfLitBytes(s){const out=[];for(let i=0;i<s.length;i++){let c=s.charCodeAt(i);if(c===92){const n=s[i+1];i++;if(n==='n')out.push(10);else if(n==='r')out.push(13);else if(n==='t')out.push(9);else if(n==='b')out.push(8);else if(n==='f')out.push(12);else if(n==='\n'){}else if(n==='\r'){if(s[i+1]==='\n')i++;}else if(/[0-7]/.test(n)){let o=n;while(o.length<3&&/[0-7]/.test(s[i+1]||''))o+=s[++i];out.push(parseInt(o,8)&255);}else out.push(n.charCodeAt(0));}else out.push(c&255);}return out;}
+function pdfParseCMap(txt){const map=new Map();let bytes=0;let srcLen=99;
+  const cs=txt.match(/begincodespacerange([\s\S]*?)endcodespacerange/);let csBytes=0;if(cs){const m=cs[1].match(/<([0-9A-Fa-f]+)>/);if(m)csBytes=Math.ceil(m[1].length/2);}
+  const utf=h=>{const u=h.replace(/[^0-9A-Fa-f]/g,'');let s='';for(let i=0;i+4<=u.length;i+=4)s+=String.fromCharCode(parseInt(u.substr(i,4),16));if(u.length%4===2)s+=String.fromCharCode(parseInt(u.slice(-2),16));return s;};
+  for(const sec of txt.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)){for(const m of sec[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]*)>/g)){map.set(parseInt(m[1],16),utf(m[2]));srcLen=Math.min(srcLen,m[1].length);}}
+  for(const sec of txt.matchAll(/beginbfrange([\s\S]*?)endbfrange/g)){const re=/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(<([0-9A-Fa-f]*)>|\[([^\]]*)\])/g;let m;
+    while((m=re.exec(sec[1]))){const lo=parseInt(m[1],16),hi=parseInt(m[2],16);srcLen=Math.min(srcLen,m[1].length);if(hi-lo>65535)continue;
+      if(m[5]!=null){const arr=[...m[5].matchAll(/<([0-9A-Fa-f]*)>/g)].map(x=>utf(x[1]));for(let c=lo,i=0;c<=hi&&i<arr.length;c++,i++)map.set(c,arr[i]);}
+      else{const d=utf(m[4]);const last=d.length?d.charCodeAt(d.length-1):0;for(let c=lo;c<=hi;c++)map.set(c,d.length?d.slice(0,-1)+String.fromCharCode(last+(c-lo)):'');}}}
+  bytes=srcLen<99?Math.ceil(srcLen/2):(csBytes||1);return {map,bytes:Math.max(1,Math.min(2,bytes))};}
+async function pdfTextLite(bytes,cap){
+  await loadLib('pdflib');const L=PDFLib;const {PDFDocument,PDFName,PDFDict,PDFArray,PDFRawStream,PDFStream,PDFRef,decodePDFRawStream}=L;
+  const doc=await PDFDocument.load(bytes,{ignoreEncryption:true,updateMetadata:false,throwOnInvalidObject:false});const ctx=doc.context;
+  const lk=o=>o instanceof PDFRef?ctx.lookup(o):o;
+  const bytesOf=st=>{if(!st)return null;try{if(st instanceof PDFRawStream)return decodePDFRawStream(st).decode();if(st instanceof PDFStream&&st.getContents)return st.getContents();}catch(e){}return null;};
+  const latin=u=>{let s='';for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return s;};
+  const fontCache=new Map();
+  const fontInfo=ref=>{const key=ref instanceof PDFRef?ref.toString():ref;if(fontCache.has(key))return fontCache.get(key);const f=lk(ref);const info={bytes:1,map:null,diff:null};
+    if(f instanceof PDFDict){const sub=f.get(PDFName.of('Subtype'));const subN=sub?sub.toString():'';
+      const tu=lk(f.get(PDFName.of('ToUnicode')));const tb=bytesOf(tu);if(tb){const cm=pdfParseCMap(latin(tb));info.map=cm.map;info.bytes=cm.bytes;}
+      if(subN==='/Type0'){info.bytes=2;}else info.bytes=1;
+      /* glyph widths (for the space heuristic) */
+      info.w=new Map();info.dw=500;
+      try{if(subN==='/Type0'){const dfs=lk(f.get(PDFName.of('DescendantFonts')));const df=dfs instanceof PDFArray?lk(dfs.get(0)):null;if(df instanceof PDFDict){const dw=lk(df.get(PDFName.of('DW')));info.dw=dw instanceof L.PDFNumber?dw.asNumber():1000;const W=lk(df.get(PDFName.of('W')));if(W instanceof PDFArray){const a=W.asArray().map(lk);for(let i=0;i<a.length;){const c=a[i]instanceof L.PDFNumber?a[i].asNumber():0;const nx=a[i+1];if(nx instanceof PDFArray){nx.asArray().map(lk).forEach((w,j)=>{if(w instanceof L.PDFNumber)info.w.set(c+j,w.asNumber());});i+=2;}else{const c2=nx instanceof L.PDFNumber?nx.asNumber():c;const w=a[i+2]instanceof L.PDFNumber?a[i+2].asNumber():info.dw;if(c2-c<65536)for(let k=c;k<=c2;k++)info.w.set(k,w);i+=3;}}}}}
+        else{const fc=lk(f.get(PDFName.of('FirstChar')));const first=fc instanceof L.PDFNumber?fc.asNumber():0;const Ws=lk(f.get(PDFName.of('Widths')));if(Ws instanceof PDFArray)Ws.asArray().map(lk).forEach((w,j)=>{if(w instanceof L.PDFNumber)info.w.set(first+j,w.asNumber());});const fd=lk(f.get(PDFName.of('FontDescriptor')));if(fd instanceof PDFDict){const mw=lk(fd.get(PDFName.of('MissingWidth')));if(mw instanceof L.PDFNumber)info.dw=mw.asNumber();}}}catch(e){}
+      const enc=lk(f.get(PDFName.of('Encoding')));if(enc instanceof PDFDict){const d=lk(enc.get(PDFName.of('Differences')));if(d instanceof PDFArray){info.diff={};let code=0;for(const it of d.asArray()){const v=lk(it);if(v instanceof L.PDFNumber)code=v.asNumber();else if(v instanceof PDFName){const g=v.toString().slice(1);info.diff[code++]=GLYPHS[g]!=null?GLYPHS[g]:(/^uni([0-9A-Fa-f]{4})$/.test(g)?String.fromCharCode(parseInt(g.slice(3),16)):(g.length===1?g:''));}}}}}
+    fontCache.set(key,info);return info;};
+  const widthOf=(arr,font,fs,Tc,Tw,Th)=>{if(!font)font={bytes:1};let w=0;const codes=[];if(font.bytes===2){for(let i=0;i+1<arr.length;i+=2)codes.push((arr[i]<<8)|arr[i+1]);}else for(const c of arr)codes.push(c);
+    for(const c of codes){const gw=font.w&&font.w.has(c)?font.w.get(c):(font.dw!=null?font.dw:500);w+=(gw/1000*fs+Tc+(c===32&&font.bytes===1?Tw:0))*Th;}return w;};
+  const decode=(arr,font)=>{if(!font)font={bytes:1};let s='';if(font.bytes===2){for(let i=0;i+1<arr.length;i+=2){const c=(arr[i]<<8)|arr[i+1];s+=font.map&&font.map.has(c)?font.map.get(c):'';}return s;}
+    for(const c of arr){if(font.map&&font.map.has(c))s+=font.map.get(c);else if(font.diff&&font.diff[c]!=null)s+=font.diff[c];else s+=pdfLatin(c);}return s;};
+  /* content stream tokenizer */
+  const tokenize=src=>{const toks=[];let i=0;const n=src.length;const isWs=c=>c===' '||c==='\n'||c==='\r'||c==='\t'||c==='\f'||c==='\0';const isDelim=c=>'()<>[]{}/%'.includes(c);
+    while(i<n){const c=src[i];if(isWs(c)){i++;continue;}
+      if(c==='%'){while(i<n&&src[i]!=='\n'&&src[i]!=='\r')i++;continue;}
+      if(c==='('){let d=1,j=i+1,s='';while(j<n&&d>0){const ch=src[j];if(ch==='\\'){s+=ch+(src[j+1]||'');j+=2;continue;}if(ch==='(')d++;else if(ch===')'){d--;if(d===0)break;}s+=ch;j++;}toks.push({t:'str',v:pdfLitBytes(s)});i=j+1;continue;}
+      if(c==='<'){if(src[i+1]==='<'){toks.push({t:'op',v:'<<'});i+=2;continue;}const j=src.indexOf('>',i);toks.push({t:'str',v:pdfHexBytes(src.slice(i+1,j<0?n:j))});i=j<0?n:j+1;continue;}
+      if(c==='>'){if(src[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2;}else i++;continue;}
+      if(c==='['){toks.push({t:'['});i++;continue;}if(c===']'){toks.push({t:']'});i++;continue;}if(c==='{'||c==='}'){i++;continue;}
+      if(c==='/'){let j=i+1;while(j<n&&!isWs(src[j])&&!isDelim(src[j]))j++;toks.push({t:'name',v:src.slice(i,j)});i=j;continue;}
+      if(/[0-9+\-.]/.test(c)){let j=i+1;while(j<n&&/[0-9.\-+]/.test(src[j]))j++;toks.push({t:'num',v:parseFloat(src.slice(i,j))||0});i=j;continue;}
+      let j=i;while(j<n&&!isWs(src[j])&&!isDelim(src[j]))j++;if(j===i){i++;continue;}toks.push({t:'op',v:src.slice(i,j)});i=j;}
+    return toks;};
+  let out='';const pages=doc.getPages().slice(0,80);
+  for(const page of pages){
+    let fonts={};try{const res=lk(page.node.Resources());const fd=res instanceof PDFDict?lk(res.get(PDFName.of('Font'))):null;if(fd instanceof PDFDict)for(const [k,v] of fd.entries())fonts[k.toString()]=v;}catch(e){}
+    let src='';try{const c=page.node.Contents();const list=c instanceof PDFArray?c.asArray().map(lk):[lk(c)];for(const st of list){const b=bytesOf(st);if(b)src+=latin(b)+'\n';}}catch(e){}
+    if(!src)continue;
+    const toks=tokenize(src);let font=null,stack=[],line='',text='';let inImg=false;
+    let fs=10,Tc=0,Tw=0,Th=1,TL=0;let lx=0,ly=0,x=0,y=0,endX=null,endY=null;let cmX=0,cmY=0;const gs=[];
+    const num=i=>{const t=stack[stack.length-i];return t&&t.t==='num'?t.v:0;};
+    const flush=()=>{if(line.trim())text+=line.replace(/\s+$/,'').replace(/ {2,}/g,' ')+'\n';line='';};
+    const show=arr=>{const ax=x+cmX,ay=y+cmY;if(endY!==null&&Math.abs(ay-endY)>0.5)flush();else if(endX!==null&&line&&!/\s$/.test(line)){if(ax-endX>0.2*fs||ax<endX-fs)line+=' ';}
+      line+=decode(arr,font);x+=widthOf(arr,font,fs,Tc,Tw,Th);endX=x+cmX;endY=ay;};
+    for(let k=0;k<toks.length;k++){const tk=toks[k];
+      if(inImg){if(tk.t==='op'&&tk.v==='EI')inImg=false;continue;}
+      if(tk.t==='op'){const op=tk.v;
+        if(op==='BI'){inImg=true;stack=[];continue;}
+        if(op==='Tf'){const nm=stack.find(x=>x.t==='name');font=nm&&fonts[nm.v]?fontInfo(fonts[nm.v]):null;fs=num(1)||fs;}
+        else if(op==='Tc')Tc=num(1);else if(op==='Tw')Tw=num(1);else if(op==='Tz')Th=(num(1)||100)/100;else if(op==='TL')TL=num(1);
+        else if(op==='Tj'){const s=[...stack].reverse().find(t=>t.t==='str');if(s)show(s.v);}
+        else if(op==="'"||op==='"'){if(op==='"'){Tw=num(3);Tc=num(2);}ly-=TL;lx=lx;x=lx;y=ly;const s=[...stack].reverse().find(t=>t.t==='str');if(s)show(s.v);}
+        else if(op==='TJ'){const a=[...stack].reverse().find(t=>t.t==='arr');if(a)for(const el of a.v){if(el.t==='str')show(el.v);else if(el.t==='num'){x-=el.v/1000*fs*Th;}}}
+        else if(op==='Td'||op==='TD'){const tx=num(2),ty=num(1);lx+=tx;ly+=ty;x=lx;y=ly;if(op==='TD')TL=-ty;}
+        else if(op==='T*'){ly-=TL;x=lx;y=ly;}
+        else if(op==='Tm'){lx=num(2);ly=num(1);x=lx;y=ly;}
+        else if(op==='BT'){lx=0;ly=0;x=0;y=0;}
+        else if(op==='cm'){cmX+=num(2);cmY+=num(1);}
+        else if(op==='q'){gs.push([cmX,cmY]);}
+        else if(op==='Q'){const g=gs.pop();if(g){cmX=g[0];cmY=g[1];}}
+        stack=[];continue;}
+      if(tk.t==='['){const arr=[];let j=k+1;while(j<toks.length&&toks[j].t!==']'){arr.push(toks[j]);j++;}stack.push({t:'arr',v:arr});k=j;continue;}
+      if(tk.t===']')continue;
+      stack.push(tk);if(stack.length>64)stack.shift();}
+    flush();out+=text+'\n';if(out.length>cap)break;}
+  return out;
+}
 /* ---------- ITT intake: read the dropped invitation, fill the tender from it ---------- */
 const ITT={busy:false,status:'',error:''};
 /* pdf.js candidates, most compatible first; if one fails at load or at use (older Safari), the next is tried */
@@ -939,10 +1022,18 @@ async function pdfExtract(lib,bytes,cap){
 const xmlUnesc=s=>s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,(m,c)=>String.fromCharCode(+c));
 async function fileText(f,cap){
   const n=f.name.toLowerCase();cap=cap||120000;
-  if(n.endsWith('.pdf')){const buf=await f.arrayBuffer();let lastErr=null;
-    for(let attempt=0;attempt<PDFJS_CANDS.length;attempt++){if(attempt&&ITT.status){ITT.status='Trying another PDF reader…';const el=document.getElementById('ittstatus');if(el)el.textContent=ITT.status;}let lib;try{lib=await pdfjsLoad(attempt>0);}catch(e){throw lastErr||e;}
-      try{return await pdfExtract(lib,new Uint8Array(buf.slice(0)),cap);}
-      catch(e){lastErr=e;const msg=String(e&&e.message||e);if(!(e instanceof TypeError||e instanceof ReferenceError||/not a function|not defined|not iterable|is not an object|withResolvers|undefined is not|null is not/i.test(msg)))throw e;}}
+  if(n.endsWith('.pdf')){const buf=await f.arrayBuffer();
+    /* 1. built-in reader (pdf-lib, no network) – good for text PDFs from Word and Acrobat */
+    let lite='';try{lite=await pdfTextLite(new Uint8Array(buf.slice(0)),cap);}catch(e){lite='';}
+    const good=t=>{const ns=t.replace(/\s/g,'');if(ns.length<200)return false;const letters=(ns.match(/[A-Za-zÀ-ÿ]/g)||[]).length;return letters/ns.length>0.5;};
+    if(good(lite))return lite;
+    /* 2. pdf.js from the CDN, several versions – handles encrypted PDFs and odd fonts */
+    let lastErr=null;
+    for(let attempt=0;attempt<PDFJS_CANDS.length;attempt++){if(attempt&&ITT.status){ITT.status='Trying another PDF reader…';const el=document.getElementById('ittstatus');if(el)el.textContent=ITT.status;}
+      let lib;try{lib=await pdfjsLoad(attempt>0);}catch(e){lastErr=e;break;}
+      try{const t=await pdfExtract(lib,new Uint8Array(buf.slice(0)),cap);if(t.trim().length>lite.trim().length)return t;return lite;}
+      catch(e){lastErr=e;const msg=String(e&&e.message||e);if(!(e instanceof TypeError||e instanceof ReferenceError||/not a function|not defined|not iterable|is not an object|withResolvers|undefined is not|null is not/i.test(msg)))break;}}
+    if(lite.trim())return lite;
     throw lastErr||new Error('PDF could not be read');}
   if(n.endsWith('.docx')){await loadLib('jszip');const z=await JSZip.loadAsync(f);const d=z.file('word/document.xml');if(!d)return '';const x=await d.async('string');return xmlUnesc(x.replace(/<\/w:p>/g,'\n').replace(/<w:tab\/>/g,'\t').replace(/<w:br[^>]*\/>/g,'\n').replace(/<[^>]+>/g,'')).slice(0,cap);}
   if(n.endsWith('.xlsx')){await loadLib('jszip');const z=await JSZip.loadAsync(f);const ss=z.file('xl/sharedStrings.xml');if(!ss)return '';const x=await ss.async('string');return xmlUnesc(x.replace(/<\/si>/g,'\n').replace(/<[^>]+>/g,'')).slice(0,cap);}
@@ -1019,7 +1110,9 @@ function ittHeuristics(text){
   const eq=[];if(cnt(/multibeam|mbes|bathymetr/))eq.push('mbes');if(cnt(/side.?scan|\bsss\b/))eq.push('sss');if(cnt(/sub.?bottom|\bsbp\b|pinger|chirp|innomar/))eq.push('sbp');if(cnt(/magnetometer|gradiometer|\buxo\b/))eq.push('mag');if(cnt(/\brov\b|remotely operated/))eq.push('rov');if(cnt(/usbl|\bgaps\b/))eq.push('gaps');r.equipment=eq;
   const CT=[['Sweden',/sweden|sverige|swedish|kattegat|\bskåne|gothenburg|göteborg|stockholm|kriegers flak|öresund|bothnia|gotland/],['United Kingdom',/united kingdom|\buk\b|england|scotland|wales|northern ireland|north sea \(uk\)|irish sea|british|hornsea|dogger bank|humber|thames|liverpool bay|scroby|galloper|triton knoll|gwynt|rhyl|north hoyle|robin rigg|moray|firth|east anglia|sofia|\bhow0\d\b|race bank|walney|burbo|rampion|beatrice|seagreen|neart|inch cape|berwick|five estuaries|norfolk/],['Denmark',/denmark|danish|danmark/],['Germany',/germany|german|deutschland/],['Netherlands',/netherlands|dutch|nederland/],['Norway',/norway|norwegian|norge/],['Finland',/finland|finnish|suomi/],['Poland',/poland|polish|polska/],['Ireland',/\bireland\b|irish/],['France',/\bfrance\b|french/],['Belgium',/belgium|belgian/],['Estonia',/estonia/],['Latvia',/latvia/],['Lithuania',/lithuania/],['Italy',/\bitaly\b|italian/],['Spain',/\bspain\b|spanish/],['Portugal',/portugal/]];
   for(const [c,re] of CT){if(re.test(low)){r.country=c;break;}}
-  const dm=t.match(/(\d{1,3}(?:[.,]\d)?)\s*(?:m\b|metres|meters)?\s*(?:–|-|to|and)\s*(\d{1,3}(?:[.,]\d)?)\s*(?:m\b|metres|meters)/i);if(dm){const a=parseFloat(dm[1].replace(',','.')),b=parseFloat(dm[2].replace(',','.'));if(a<b&&b<400){r.depthMin=a;r.depthMax=b;}}
+  const dre=/(\d{1,3}(?:[.,]\d)?)\s*(?:m\b|metres|meters)?\s*(?:–|-|to|and)\s*(\d{1,3}(?:[.,]\d)?)\s*(?:m\b|metres|meters)\b/i;
+  const dz=(()=>{const re=/water depths?|depths? (?:of water|range|ranging|vary|varies|between|from)|depth range|bathymetr(?:y|ic) (?:range|of)/gi;let m;while((m=re.exec(t))){const seg=t.slice(m.index,m.index+200);if(dre.test(seg))return seg;}return '';})();
+  const dm=dz.match(dre);if(dm){const a=parseFloat(dm[1].replace(',','.')),b=parseFloat(dm[2].replace(',','.'));if(a<b&&b<400){r.depthMin=a;r.depthMax=b;}}
   const sm=t.match(/IHO\s*S-?44[^.\n]{0,60}?(Exclusive Order|Special Order|Order\s*1[ab]?|Order\s*2)/i);if(sm)r.standard='IHO S-44 '+sm[1].replace(/\s+/g,' ');
   const rm=t.match(/(?:tender\s*(?:no\.?|number|ref(?:erence)?)|reference\s*(?:no\.?|number)|ITT\s*(?:no\.?|ref\.?)|RFQ|RFP|RFI)\s*[:#]?\s*((?=[A-Za-z0-9\/._-]*\d)[A-Z0-9][A-Za-z0-9\/._-]{3,24})/);if(rm)r.ref=rm[1];
   const MON={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12,jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12};
