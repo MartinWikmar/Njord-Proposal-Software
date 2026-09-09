@@ -289,7 +289,7 @@ details.xp>.xp-body{padding:2px 18px 6px;border-top:1px solid var(--line-soft)}
       <select id="role"></select>
       <input id="user" placeholder="Your name (for the log)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:6px;padding:7px 8px">
     </div>
-    <div class="foot">Njord Proposal Software v2.2 · <span id="storemode">figures in this browser</span>. All amounts SEK excl. VAT.<br><a href="https://njord-vessel-map.web.app" target="_blank" rel="noopener">Njord Vessel Map ↗</a> · <a href="#" data-act="tour-start">Tutorial</a> · <a href="#" id="gate-lock">Lock</a></div>
+    <div class="foot">Njord Proposal Software v2.5 · <span id="storemode">figures in this browser</span>. All amounts SEK excl. VAT.<br><a href="https://njord-vessel-map.web.app" target="_blank" rel="noopener">Njord Vessel Map ↗</a> · <a href="#" data-act="tour-start">Tutorial</a> · <a href="#" id="gate-lock">Lock</a></div>
   </nav>
 
   <main class="main">
@@ -1299,7 +1299,7 @@ location: the sea area or site in a few words;
 country: the country of the survey area (English name; "United Kingdom" for England, Scotland, Wales, Northern Ireland);
 equipment: array from "mbes","sss","sbp","mag","rov","gaps" (USBL) that the ITT requires or clearly needs;
 size: {area_km2, corridor_km, corridor_width_m, line_km} – numbers or null, the whole scope;
-areas: array with one entry per survey area, corridor, block, lot, site or work package the ITT describes (the tender is priced per area, so list every one, in the ITT's order): {name (the ITT's own name, e.g. "Area A – Landfall", "Lot 2 Export cable corridor", "Block North"), kind: "area" | "corridor" | "lines", area_km2, length_km, width_m, line_km, depthMin, depthMax, nearshore (true when it is a landfall, nearshore, beach, port or shallow part), sensors (array from "mbes","sss","sbp","mag","rov"), notes}. Give numbers for the size: use the figures in the text, or ESTIMATE from coordinates, dimensions, hectares, maps or the number of lines (length × width for a corridor; state "size estimated" in notes when you estimated), never null when any figure can be derived; one entry when the ITT has one area;
+areas: array with one entry per survey area, corridor, block, lot, site or work package the ITT describes (the tender is priced per area, so list every one, in the ITT's order): {name (the ITT's own name, e.g. "Area A – Landfall", "Lot 2 Export cable corridor", "Block North"), kind: "area" | "corridor" | "lines", area_km2, length_km, width_m, line_km, depthMin, depthMax, nearshore (true when the area is 10 m of water or shallower – landfall, beach, port, intertidal – Njord surveys those with a small vessel), sensors (array from "mbes","sss","sbp","mag","rov") for THIS area, lineSpacingM (only when the ITT prescribes a line spacing for the area, else null), notes}. When one area runs from the shore out to deep water (a cable route from the landfall), split it into a nearshore part (0–10 m) and an offshore part (deeper than 10 m) with their own sizes and depths. Give numbers for the size: use the figures in the text, or ESTIMATE from coordinates, dimensions, hectares, maps or the number of lines (length × width for a corridor; state "size estimated" in notes when you estimated), never null when any figure can be derived; one entry when the ITT has one area;
 depthMin and depthMax: water depth range in metres (numbers or null);
 standard: survey standard as written, e.g. "IHO S-44 Order 1a";
 datumH and datumV: horizontal and vertical datum / coordinate system if stated;
@@ -1415,7 +1415,7 @@ function ittApply(r){
   setIf(S,'client',r.client);if(!S.itt.tenderFolder){setIf(S,'clientShort',r.clientShort&&String(r.clientShort).replace(/[^\w]/g,''));setIf(S,'jobShort',r.jobShort&&String(r.jobShort).replace(/\s+/g,'_').replace(/[^\w]/g,''));}setIf(S,'title1',r.title1);setIf(S,'title2',r.title2);setIf(S,'ref',r.ref);setIf(S,'due',r.due);
   setIf(I,'location',r.location);setIf(I,'country',r.country);setIf(I,'standard',r.standard);setIf(I,'start',r.start);setIf(I,'objective',r.objective);setIf(I,'deliverables',r.deliverables);setIf(I,'notes',r.notes);setIf(I,'datumH',r.datumH);setIf(I,'datumV',r.datumV);
   if(r.depthMax>0){I.depthMin=+r.depthMin||0;I.depthMax=+r.depthMax;}
-  I.areas=Array.isArray(r.areas)?r.areas.filter(a=>a&&(a.area_km2>0||a.length_km>0||a.line_km>0)).map(a=>({name:String(a.name||'').trim(),kind:/corridor/i.test(a.kind)?'corridor':/line/i.test(a.kind)?'lines':'area',area_km2:+a.area_km2||0,length_km:+a.length_km||0,width_m:+a.width_m||0,line_km:+a.line_km||0,depthMin:a.depthMin!=null?+a.depthMin:null,depthMax:a.depthMax!=null?+a.depthMax:null,nearshore:!!a.nearshore,sensors:Array.isArray(a.sensors)?a.sensors:null,notes:String(a.notes||'')})):[];
+  I.areas=Array.isArray(r.areas)?r.areas.filter(a=>a&&(a.area_km2>0||a.length_km>0||a.line_km>0)).map(a=>({name:String(a.name||'').trim(),kind:/corridor/i.test(a.kind)?'corridor':/line/i.test(a.kind)?'lines':'area',area_km2:+a.area_km2||0,length_km:+a.length_km||0,width_m:+a.width_m||0,line_km:+a.line_km||0,depthMin:a.depthMin!=null?+a.depthMin:null,depthMax:a.depthMax!=null?+a.depthMax:null,nearshore:!!a.nearshore,sensors:Array.isArray(a.sensors)?a.sensors:null,lineSpacingM:+a.lineSpacingM||0,notes:String(a.notes||'')})):[];
   {const ds=I.areas.filter(a=>a.depthMax>0);if(ds.length){const lo=Math.min(...ds.map(a=>a.depthMin||0)),hi=Math.max(...ds.map(a=>a.depthMax));if(hi>0){I.depthMin=lo;I.depthMax=hi;}}} /* the whole scope spans all areas */
   const st=S.std;setIf(st,'client',r.client);setIf(st,'ref',r.ref);setIf(st,'due',r.due);setIf(st,'location',r.location);setIf(st,'start',r.start);
   if(r.jobType&&RECIPES[r.jobType]){st.jobType=r.jobType;const rec=RECIPES[r.jobType];if(rec.shape)st.shape=rec.shape;if(rec.width)st.width=rec.width;}
@@ -1451,6 +1451,283 @@ function vIttRead(){
     </div>
     <div class="row" style="margin-top:8px;justify-content:flex-end;gap:8px"><button class="btn sm" data-act="itt-read">Read the ITT again</button></div>`:'');
 }
+/* =========================================================
+   Survey polygons → blocks, and depths from EMODnet (Njord MCP)
+   Reads shapefile zips (.shp/.dbf/.prj), KML/KMZ and GeoJSON in the browser,
+   projects to WGS84, measures area / length / width, and can ask the Njord MCP
+   connector (claude.ai) for the mean depth and a depth profile so a block can be
+   split into depth zones the way the calculations spreadsheet does.
+   ========================================================= */
+const GEO={busy:false,status:'',error:''};
+/* ---------- Transverse Mercator (WGS84 / GRS80 – the difference is far below survey scale) ---------- */
+const TM={a:6378137.0,f:1/298.257223563};
+function tmInverse(x,y,lon0,k0,fe,fn){const a=TM.a,f=TM.f;const e2=f*(2-f),ep2=e2/(1-e2);x-=fe;y-=fn;const M=y/k0;const mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256));
+  const e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));const phi1=mu+(3*e1/2-27*Math.pow(e1,3)/32)*Math.sin(2*mu)+(21*e1*e1/16-55*Math.pow(e1,4)/32)*Math.sin(4*mu)+(151*Math.pow(e1,3)/96)*Math.sin(6*mu);
+  const s=Math.sin(phi1),c=Math.cos(phi1),t=Math.tan(phi1);const N1=a/Math.sqrt(1-e2*s*s),T1=t*t,C1=ep2*c*c,R1=a*(1-e2)/Math.pow(1-e2*s*s,1.5),D=x/(N1*k0);
+  const lat=phi1-(N1*t/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*Math.pow(D,4)/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*Math.pow(D,6)/720);
+  const lon=lon0*Math.PI/180+(D-(1+2*T1+C1)*Math.pow(D,3)/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*Math.pow(D,5)/120)/c;
+  return [lon*180/Math.PI,lat*180/Math.PI];}
+function tmForward(lon,lat,lon0,k0,fe,fn){const a=TM.a,f=TM.f;const e2=f*(2-f),ep2=e2/(1-e2);const phi=lat*Math.PI/180,lam=(lon-lon0)*Math.PI/180;const s=Math.sin(phi),c=Math.cos(phi),t=Math.tan(phi);
+  const N=a/Math.sqrt(1-e2*s*s),T=t*t,C=ep2*c*c,A=lam*c;const M=a*((1-e2/4-3*e2*e2/64-5*Math.pow(e2,3)/256)*phi-(3*e2/8+3*e2*e2/32+45*Math.pow(e2,3)/1024)*Math.sin(2*phi)+(15*e2*e2/256+45*Math.pow(e2,3)/1024)*Math.sin(4*phi)-(35*Math.pow(e2,3)/3072)*Math.sin(6*phi));
+  const x=fe+k0*N*(A+(1-T+C)*Math.pow(A,3)/6+(5-18*T+T*T+72*C-58*ep2)*Math.pow(A,5)/120);
+  const y=fn+k0*(M+N*t*(A*A/2+(5-T+9*C+4*C*C)*Math.pow(A,4)/24+(61-58*T+T*T+600*C-330*ep2)*Math.pow(A,6)/720));return [x,y];}
+/* the projection of a .prj (WKT) – UTM zones, SWEREF99 TM / ETRS89 TM zones, or plain lat/lon */
+function prjParse(wkt){const w=String(wkt||'');if(!w.trim()||/^GEOGCS/i.test(w.trim()))return {geo:true};
+  const utm=w.match(/UTM[_\s]*zone[_\s]*(\d{1,2})\s*([NS])?/i);const cm=w.match(/central_meridian"?\s*,\s*(-?[\d.]+)/i),sf=w.match(/scale_factor"?\s*,\s*([\d.]+)/i),fe=w.match(/false_easting"?\s*,\s*([\d.]+)/i),fn=w.match(/false_northing"?\s*,\s*([\d.]+)/i);
+  if(/Transverse_Mercator/i.test(w)&&cm)return {geo:false,lon0:+cm[1],k0:sf?+sf[1]:0.9996,fe:fe?+fe[1]:500000,fn:fn?+fn[1]:0,name:(w.match(/PROJCS\["([^"]+)"/)||[])[1]||'TM'};
+  if(utm){const z=+utm[1];return {geo:false,lon0:-183+6*z,k0:0.9996,fe:500000,fn:/S/i.test(utm[2]||'N')?10000000:0,name:'UTM '+z+(utm[2]||'N')};}
+  if(/SWEREF99[_\s]*TM/i.test(w))return {geo:false,lon0:15,k0:0.9996,fe:500000,fn:0,name:'SWEREF99 TM'};
+  return {geo:false,unknown:true,name:(w.match(/PROJCS\["([^"]+)"/)||[])[1]||'unknown'};}
+/* ---------- shapefile (.shp polygons) and .dbf attributes ---------- */
+function shpPolygons(buf){const dv=new DataView(buf);const out=[];let pos=100;const n=buf.byteLength;
+  while(pos+8<=n){const len=dv.getInt32(pos+4,false);pos+=8;const start=pos;const t=dv.getInt32(start,true);
+    if(t===5||t===15||t===25){const nparts=dv.getInt32(start+36,true),npts=dv.getInt32(start+40,true);const parts=[];for(let i=0;i<nparts;i++)parts.push(dv.getInt32(start+44+4*i,true));let o=start+44+4*nparts;const pts=[];for(let i=0;i<npts;i++){pts.push([dv.getFloat64(o,true),dv.getFloat64(o+8,true)]);o+=16;}
+      const rings=parts.map((p,k)=>pts.slice(p,k+1<parts.length?parts[k+1]:pts.length));out.push(rings);}
+    else out.push(null);pos=start+len*2;}
+  return out;}
+function dbfRecords(buf){const dv=new DataView(buf);const nrec=dv.getUint32(4,true),hlen=dv.getUint16(8,true),rlen=dv.getUint16(10,true);const dec=new TextDecoder('latin1');const fields=[];let i=32;const u=new Uint8Array(buf);
+  while(i<hlen-1&&u[i]!==0x0d){let name='';for(let k=0;k<11&&u[i+k];k++)name+=String.fromCharCode(u[i+k]);fields.push({name,type:String.fromCharCode(u[i+11]),len:u[i+16]});i+=32;}
+  const recs=[];for(let r=0;r<nrec;r++){const base=hlen+r*rlen;if(base+rlen>u.length)break;let o=base+1;const rec={};for(const f of fields){rec[f.name]=dec.decode(u.subarray(o,o+f.len)).trim();o+=f.len;}recs.push(rec);}
+  return recs;}
+/* ---------- KML / GeoJSON ---------- */
+function kmlPolygons(text){const out=[];const doc=new DOMParser().parseFromString(text,'application/xml');
+  [...doc.getElementsByTagName('Placemark')].forEach(pm=>{const name=(pm.getElementsByTagName('name')[0]||{}).textContent||'';[...pm.getElementsByTagName('Polygon')].forEach(pg=>{const rings=[...pg.getElementsByTagName('coordinates')].map(c=>c.textContent.trim().split(/\s+/).map(s=>s.split(',').map(Number)).filter(p=>p.length>=2).map(p=>[p[0],p[1]]));if(rings.length&&rings[0].length>3)out.push({name,rings,geo:true});});});
+  if(!out.length)[...doc.getElementsByTagName('Polygon')].forEach(pg=>{const rings=[...pg.getElementsByTagName('coordinates')].map(c=>c.textContent.trim().split(/\s+/).map(s=>s.split(',').map(Number)).map(p=>[p[0],p[1]]));if(rings.length)out.push({name:'',rings,geo:true});});
+  return out;}
+function geojsonPolygons(text){const out=[];let j;try{j=JSON.parse(text);}catch(e){return out;}const feats=j.type==='FeatureCollection'?j.features:j.type==='Feature'?[j]:[{type:'Feature',geometry:j,properties:{}}];
+  feats.forEach(f=>{const g=f.geometry||{};const p=f.properties||{};const name=p.NAME||p.Name||p.name||p.title||p.id||'';if(g.type==='Polygon')out.push({name,rings:g.coordinates,geo:true});else if(g.type==='MultiPolygon')g.coordinates.forEach((c,i)=>out.push({name:name?name+(g.coordinates.length>1?' '+(i+1):''):'',rings:c,geo:true}));});
+  return out;}
+/* ---------- geometry ---------- */
+function ringArea(r){let a=0;for(let i=0;i<r.length-1;i++)a+=r[i][0]*r[i+1][1]-r[i+1][0]*r[i][1];return a/2;}
+function polyMetrics(ringsLL){/* rings in WGS84 → local TM around the centroid → area, length, width, centroid */
+  const all=ringsLL[0];const lon0=all.reduce((a,p)=>a+p[0],0)/all.length;const proj=r=>r.map(p=>tmForward(p[0],p[1],lon0,1,0,0));
+  const rp=ringsLL.map(proj);let area=Math.abs(ringArea(rp[0]));for(let i=1;i<rp.length;i++)area-=Math.abs(ringArea(rp[i]));
+  const pts=rp[0];const cx=pts.reduce((a,p)=>a+p[0],0)/pts.length,cy=pts.reduce((a,p)=>a+p[1],0)/pts.length;
+  /* principal axis: the direction of the longest extent */
+  let sxx=0,syy=0,sxy=0;pts.forEach(p=>{const dx=p[0]-cx,dy=p[1]-cy;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});const th=0.5*Math.atan2(2*sxy,sxx-syy);const ux=Math.cos(th),uy=Math.sin(th);
+  let mn=1e18,mx=-1e18,wn=1e18,wx=-1e18;pts.forEach(p=>{const dx=p[0]-cx,dy=p[1]-cy;const u=dx*ux+dy*uy,v=-dx*uy+dy*ux;if(u<mn)mn=u;if(u>mx)mx=u;if(v<wn)wn=v;if(v>wx)wx=v;});
+  const length=mx-mn,boxWidth=wx-wn;const meanWidth=length>0?area/length:0;
+  const c=tmInverse(cx,cy,lon0,1,0,0);
+  return {areaKm2:area/1e6,lengthKm:length/1000,meanWidthM:meanWidth,boxWidthM:boxWidth,elongation:meanWidth>0?length/meanWidth:1,centroid:[c[1],c[0]],axis:{lon0,cx,cy,ux,uy,mn,mx,wn,wx}};}
+function ringThin(r,max){if(r.length<=max)return r;const step=Math.ceil(r.length/max);const out=[];for(let i=0;i<r.length;i+=step)out.push(r[i]);if(out[out.length-1][0]!==r[r.length-1][0]||out[out.length-1][1]!==r[r.length-1][1])out.push(r[r.length-1]);return out;}
+function pointInRing(pt,r){let inside=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))inside=!inside;}return inside;}
+/* a lawnmower route inside the polygon (WGS84 ring) along its long axis – for the depth profile */
+function polyRoute(ringLL,nLines){const m=polyMetrics([ringLL]);const {lon0,cx,cy,ux,uy,mn,mx,wn,wx}=m.axis;const rp=ringLL.map(p=>tmForward(p[0],p[1],lon0,1,0,0));const out=[];nLines=nLines||5;
+  for(let k=0;k<nLines;k++){const v=wn+(wx-wn)*(k+0.5)/nLines;const line=[];const steps=40;for(let s=0;s<=steps;s++){const u=mn+(mx-mn)*(k%2?1-s/steps:s/steps);const x=cx+u*ux-v*uy,y=cy+u*uy+v*ux;if(pointInRing([x,y],rp))line.push([x,y]);}
+    if(line.length>=2)out.push(...line.map(p=>{const ll=tmInverse(p[0],p[1],lon0,1,0,0);return [Math.round(ll[0]*1e5)/1e5,Math.round(ll[1]*1e5)/1e5];}));}
+  return out;}
+/* ---------- files → polygons ---------- */
+async function geoReadFiles(files){await loadLib('jszip');const polys=[];const notes=[];
+  const shpSets={};const add=(key,kind,data)=>{(shpSets[key]=shpSets[key]||{})[kind]=data;};
+  for(const f of files){const name=f.name;const low=name.toLowerCase();
+    if(/\.(zip|kmz)$/.test(low)){const z=await JSZip.loadAsync(f);for(const [n,e] of Object.entries(z.files)){if(e.dir||/(^|\/)__MACOSX\//.test(n)||/(^|\/)\./.test(n))continue;const l=n.toLowerCase();const base=n.replace(/\.[^.]+$/,'');
+        if(l.endsWith('.shp'))add(base,'shp',await e.async('arraybuffer'));else if(l.endsWith('.dbf'))add(base,'dbf',await e.async('arraybuffer'));else if(l.endsWith('.prj'))add(base,'prj',await e.async('string'));
+        else if(l.endsWith('.kml'))polys.push(...kmlPolygons(await e.async('string')).map(p=>({...p,file:n})));else if(/\.(geojson|json)$/.test(l))polys.push(...geojsonPolygons(await e.async('string')).map(p=>({...p,file:n})));}}
+    else if(low.endsWith('.shp'))add(name.replace(/\.[^.]+$/,''),'shp',await f.arrayBuffer());else if(low.endsWith('.dbf'))add(name.replace(/\.[^.]+$/,''),'dbf',await f.arrayBuffer());else if(low.endsWith('.prj'))add(name.replace(/\.[^.]+$/,''),'prj',await f.text());
+    else if(low.endsWith('.kml'))polys.push(...kmlPolygons(await f.text()).map(p=>({...p,file:name})));else if(/\.(geojson|json)$/.test(low))polys.push(...geojsonPolygons(await f.text()).map(p=>({...p,file:name})));}
+  for(const [base,set] of Object.entries(shpSets)){if(!set.shp)continue;const prj=prjParse(set.prj||'');if(prj.unknown){notes.push(`${base}: unknown projection (${prj.name}) – export the shapefile in WGS84 or UTM`);continue;}
+    const shapes=shpPolygons(set.shp);const recs=set.dbf?dbfRecords(set.dbf):[];
+    shapes.forEach((rings,i)=>{if(!rings)return;const rec=recs[i]||{};const name=rec.NAME||rec.Name||rec.name||rec.ID||rec.Id||rec.id||rec.LABEL||rec.Label||'';
+      const ll=prj.geo?rings:rings.map(r=>r.map(p=>tmInverse(p[0],p[1],prj.lon0,prj.k0,prj.fe,prj.fn)));polys.push({name:String(name||'').trim(),rings:ll,geo:true,file:base.split('/').pop()+'.shp',crs:prj.name||'WGS84'});});}
+  return {polys,notes};}
+/* polygons → survey blocks (area ÷ spacing like the spreadsheet; corridors keep their length and mean width for the text) */
+function geoBlocksFrom(polys){return polys.map((p,i)=>{const m=polyMetrics(p.rings);const outer=ringThin(p.rings[0],150);const name=p.name||p.file.replace(/\.[^.]+$/,'')||`Area ${i+1}`;
+  return {name,areaKm2:Math.round(m.areaKm2*100)/100,lengthKm:Math.round(m.lengthKm*10)/10,widthM:Math.round(m.meanWidthM),elongation:m.elongation,corridor:m.elongation>=4,pos:`${m.centroid[0].toFixed(3)}, ${m.centroid[1].toFixed(3)}`,poly:outer.map(q=>[Math.round(q[0]*1e5)/1e5,Math.round(q[1]*1e5)/1e5]),crs:p.crs||'WGS84',file:p.file};});}
+async function geoImport(files,replace){GEO.busy=true;GEO.error='';GEO.status='Reading the polygons…';render();
+  try{const {polys,notes}=await geoReadFiles(files);if(!polys.length){GEO.error='No polygons found – drop a shapefile zip (.shp + .prj + .dbf), a KML/KMZ or a GeoJSON file'+(notes.length?' ('+notes.join('; ')+')':'');GEO.busy=false;render();return 0;}
+    const gb=geoBlocksFrom(polys);const rec=(S.std&&RECIPES[S.std.jobType])||{};const first=S.blocks[0]||{};
+    const mk=(g,i)=>({id:uid(S.blocks),name:g.name,mode:'area',area:g.areaKm2,width:g.widthM||num(first.width)||500,length:Math.round(g.lengthKm*1000),lineKm:0,driver:first.driver||rec.driver||'mbes',depth:num(first.depth)||10,angle:first.angle||130,overlap:first.overlap??rec.overlap??20,range:first.range??rec.range??75,ssOverlap:first.ssOverlap??rec.ssOverlap??100,speed:first.speed||rec.speed||5,turns:0,cross:false,complexity:1,pos:g.pos,spread:first.spread||(S.spreads[0]&&S.spreads[0].id)||1,
+      poly:g.poly,geo:{areaKm2:g.areaKm2,lengthKm:g.lengthKm,widthM:g.widthM,corridor:g.corridor,file:g.file,crs:g.crs}});
+    const blocks=gb.map(mk);
+    if(replace||(S.blocks.length===1&&!S.blocks[0].poly)){S.blocks=blocks;}else{blocks.forEach(b=>S.blocks.push(b));}
+    S.blocks.forEach((b,i)=>{if(!b.name)b.name='Block '+(i+1);});
+    GEO.status='';GEO.busy=false;save();render();
+    toast(`${blocks.length} block${blocks.length===1?'':'s'} from the polygons – ${gb.map(g=>`${g.name} ${g.areaKm2} km²`).join(', ')}${notes.length?' · '+notes.join('; '):''}`);
+    /* the depth decides the line spacing – read it straight away rather than leaving the recipe's default */
+    const mcp=await njordMcp();
+    if(mcp){for(let i=0;i<S.blocks.length&&i<6;i++){if(S.blocks[i].poly&&!S.blocks[i].depthInfo)await blockDepth(i,true);}render();
+      const done=S.blocks.filter(b=>b.depthInfo).length;if(done)toast(`Depth from EMODnet for ${done} block${done===1?'':'s'} – press "Split into depth zones" where the range is wide`);}
+    return blocks.length;}
+  catch(e){GEO.error='Could not read the polygons: '+(e&&e.message||e);GEO.busy=false;render();return 0;}}
+/* ---------- depths from EMODnet through the Njord MCP connector (claude.ai) ---------- */
+async function njordMcp(){try{return window.claude&&claude.use?await claude.use('mcp'):null;}catch(e){return null;}}
+function mcpJson(r){let p=r&&r.payload;if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){}}return p||{};}
+function blockGeometry(b){if(b.poly&&b.poly.length>3)return {type:'Polygon',coordinates:[b.poly]};
+  const m=String(b.pos||'').match(/(-?\d+(?:[.,]\d+)?)\s*[, ]\s*(-?\d+(?:[.,]\d+)?)/);if(!m)return null;const lat=parseFloat(m[1].replace(',','.')),lon=parseFloat(m[2].replace(',','.'));
+  /* no polygon: a box of the block's size around the position */
+  const km2=b.mode==='area'?num(b.area):b.mode==='corridor'?num(b.width)*num(b.length)/1e6:4;const half=Math.sqrt(Math.max(0.25,km2))*1000/2;const dLat=half/111320,dLon=half/(111320*Math.cos(lat*Math.PI/180));
+  return {type:'Polygon',coordinates:[[[lon-dLon,lat-dLat],[lon+dLon,lat-dLat],[lon+dLon,lat+dLat],[lon-dLon,lat+dLat],[lon-dLon,lat-dLat]]]};}
+async function blockDepth(i,quiet){const b=S.blocks[i];if(!b)return;const g=blockGeometry(b);if(!g){if(!quiet)toast('Give the block a position (lat, lon) or drop its polygon first');return;}
+  const mcp=await njordMcp();if(!mcp){if(!quiet)toast('Depths from EMODnet come through the Njord MCP connection in the claude.ai version – use the Vessel Map here');return;}
+  GEO.busy=true;GEO.status='Asking EMODnet for the depth of '+b.name+'…';render();
+  try{const r=mcpJson(await mcp.callTool('Njord MCP','njord_mean_depth',{geometry:g}));if(r.meanDepthM==null)throw {message:'no depth returned'};
+    b.depth=Math.round(r.meanDepthM*10)/10;b.depthInfo={mean:r.meanDepthM,min:r.minDepthM,max:r.maxDepthM,samples:r.samples,areaKm2:r.areaKm2,partial:!!r.partial,at:new Date().toISOString().slice(0,10),source:'EMODnet (Njord MCP)'};
+    if(!quiet)toast(`${b.name}: mean depth ${r.meanDepthM} m below LAT (${r.minDepthM}–${r.maxDepthM} m, ${r.samples} samples)${r.partial?' – EMODnet was rate-limited, check again later':''}`);}
+  catch(e){const code=e&&e.code||'';GEO.error=code==='server_not_connected'?'Njord MCP is not connected in your Claude account (Settings › Connectors)':code==='not_granted'?'The Njord MCP connection was not allowed for this page – allow it when asked':'EMODnet depth failed: '+String(e&&e.message||e).slice(0,160);}
+  GEO.busy=false;if(!quiet){save();render();}else save();}
+/* split a block into depth zones – the way the spreadsheet prices a corridor as nearshore / intermediate / deep rows */
+async function blockSplitZones(i){const b=S.blocks[i];if(!b)return;if(!b.poly||b.poly.length<4){toast('Drop the block\'s polygon first – the zones are read along it');return;}
+  const mcp=await njordMcp();if(!mcp){toast('Depth zones come through the Njord MCP connection in the claude.ai version');return;}
+  GEO.busy=true;GEO.status='Reading the depth profile of '+b.name+' from EMODnet…';render();
+  try{const route=polyRoute(b.poly,5);if(route.length<4)throw {message:'could not lay a route inside the polygon'};
+    const r=mcpJson(await mcp.callTool('Njord MCP','njord_depth_profile',{route,samples:Math.min(400,Math.max(60,route.length*2))}));
+    const depths=(r.points||[]).map(p=>p.depthM).filter(d=>typeof d==='number'&&d>=0);if(depths.length<6)throw {message:'too few depth samples ('+depths.length+')'};
+    /* bands: 0–5 nearshore, 5–12 intermediate, 12–25, 25+ – merged when a band holds less than 10 % */
+    /* design depth per band = the shallowest quarter of its samples (the spreadsheet prices each zone at its shallow end – 2 m, 5 m, 12 m) */
+    const q25=d=>{const s=d.slice().sort((a,b)=>a-b);return s[Math.min(s.length-1,Math.floor((s.length-1)*0.25))];};
+    const lim=num(S.rates.nearshoreLimit||10);const edges=[0,Math.min(5,lim),lim,lim*2,lim*3.5,1e9].filter((x,i,a)=>i===0||x>a[i-1]);let bands=[];for(let k=0;k<edges.length-1;k++){const d=depths.filter(x=>x>=edges[k]&&x<edges[k+1]);if(d.length)bands.push({lo:edges[k],hi:edges[k+1],n:d.length,mean:d.reduce((a,x)=>a+x,0)/d.length,design:Math.max(edges[k]||0.5,q25(d))});}
+    const total=depths.length;bands=bands.filter(z=>z.n/total>=0.1||bands.length===1);const nSum=bands.reduce((a,z)=>a+z.n,0);
+    if(bands.length<2){b.depth=Math.round(bands[0].mean*10)/10;toast(`${b.name}: one depth zone – mean ${b.depth} m (${depths.length} samples)`);GEO.busy=false;save();render();return;}
+    const area=b.mode==='area'?num(b.area):b.mode==='corridor'?num(b.width)*num(b.length)/1e6:0;const base=b.name.replace(/\s*[–-]\s*\d+[–-]\d+ m$/,'');
+    const parts=bands.map((z,k)=>{const share=z.n/nSum;const nb=JSON.parse(JSON.stringify(b));nb.id=uid(S.blocks)+k;nb.name=`${base} – ${Math.round(z.lo)}–${z.hi>1000?Math.round(Math.max(...depths)):z.hi} m`;nb.mode='area';nb.area=Math.round(area*share*100)/100;nb.depth=Math.round(z.design*10)/10;nb.zone={lo:z.lo,hi:z.hi,share:Math.round(share*100),samples:z.n,mean:Math.round(z.mean*10)/10,of:b.name};delete nb.poly;delete nb.depthInfo;
+      return nb;});
+    S.blocks.splice(i,1,...parts);S.blocks.forEach((x,k)=>{x.id=k+1;});
+    toast(`${b.name} split into ${parts.length} depth zones from ${depths.length} EMODnet samples – ${parts.map(p=>`${p.zone.share} % priced at ${p.depth} m (mean ${p.zone.mean} m)`).join(', ')}`);
+    /* nearshore zones belong on a nearshore vessel */
+    if(typeof splitSpreads==='function'&&S.blocks.some(isNear)&&S.blocks.some(x=>!isNear(x)))splitSpreads();}
+  catch(e){const code=e&&e.code||'';GEO.error=code==='server_not_connected'?'Njord MCP is not connected in your Claude account (Settings › Connectors)':code==='not_granted'?'The Njord MCP connection was not allowed for this page – allow it when asked':'Depth zones failed: '+String(e&&e.message||e).slice(0,160);}
+  GEO.busy=false;save();render();}
+/* =========================================================
+   QC – check the tender against the ITT, against nature (EMODnet depth,
+   weather climatology) and against Severa history, through the Njord MCP
+   connection. Every check says what it compared and what it expected.
+   ========================================================= */
+const QC={busy:false,status:'',error:'',at:'',rows:[],src:{}};
+const qcNum=x=>typeof x==='number'&&isFinite(x)?x:null;
+function qcAdd(level,area,text,detail){QC.rows.push({level,area,text,detail:detail||''});}
+function qcMcp(){return njordMcp();}
+const QC_SERVER='Njord MCP';
+async function qcSevera(mcp,entity,filter,first){try{const r=await mcp.callTool(QC_SERVER,'read_records',{entity,filter,first:first||20});const p=mcpJson(r);const v=p&&p.result&&p.result.value;return Array.isArray(v)?v:[];}catch(e){QC.src.severaError=String(e&&(e.message||e.code)||e).slice(0,140);return [];}}
+/* what a Severa project's description says about size, days and sensors – the tender team writes them there */
+function qcParseDesc(p){const t=String(p.description||'')+' '+String(p.name||'');const n=x=>parseFloat(String(x).replace(/[\s,]/g,''));
+  const km=t.match(/([\d\s.,]{2,9})\s*(?:line\s*km|line-km)/i);const a=t.match(/([\d.,]+)\s*km2/i);
+  const d1m=t.match(/(\d{1,3}(?:[.,]\d)?)\s*(?:survey|op(?:eration)?)\s*days?/i);const d2=t.match(/(?:duration|~)\s*[:~]?\s*(\d{1,3}(?:[.,]\d)?)\s*days?/i);const wx=t.match(/\+\s*(\d{1,3}(?:[.,]\d)?)\s*(?:days?\s*)?weather/i);
+  const days=d1m?n(d1m[1])+(wx?n(wx[1]):0):d2?n(d2[1]):null;
+  return {lineKm:km?n(km[1]):null,areaKm2:a?n(a[1]):null,days:days||null,
+    sensors:['mbes','sss','sbp','mag','rov'].filter(k=>new RegExp(k==='mbes'?'MBES|multibeam':k==='sss'?'SSS|side ?scan':k==='sbp'?'SBP|sub-?bottom':k==='mag'?'MAG|magnetom':'ROV','i').test(t)),
+    value:qcNum(p.expected_value_sek),no:p.project_no,name:p.name,status:p.sales_status||p.status_name||''};}
+/* the ITT's own figures, as read or typed */
+function qcIttFigures(){const I=S.itt||{};const areas=(I.areas||[]);const r=I.read||{};const sz=r.size||{};
+  const areaKm2=areas.length?areas.reduce((a,x)=>a+(+x.area_km2||(+x.length_km||0)*(+x.width_m||0)/1000),0):qcNum(+sz.area_km2)||((+sz.corridor_km||0)*(+sz.corridor_width_m||0)/1000)||null;
+  return {areaKm2:areaKm2||null,lineKm:qcNum(+sz.line_km)||null,depthMin:qcNum(+I.depthMin),depthMax:qcNum(+I.depthMax),start:I.start||'',standard:I.standard||'',nAreas:areas.length,notes:I.notes||'',deliverables:I.deliverables||''};}
+function qcMonthOf(text){const M={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};const t=String(text||'').toLowerCase();
+  for(const k in M)if(t.includes(k))return M[k];const q=t.match(/q([1-4])/);if(q)return [1,4,7,10][+q[1]-1];return null;}
+const QC_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+async function qcRun(){
+  if(QC.busy)return;QC.busy=true;QC.error='';QC.rows=[];QC.src={};QC.status='Checking the tender…';render();
+  const c=calc();const I=S.itt||{};const itt=qcIttFigures();const R=S.rates;const cur=(S.price.currency||'SEK').toUpperCase();
+  const areaKm2=S.blocks.reduce((a,b)=>a+(b.mode==='area'?num(b.area):b.mode==='corridor'?num(b.width)*num(b.length)/1e6:0),0);
+  const totalDays=c.totalDays,lineKm=c.lineKm,total=c.total;
+  const sek=v=>Math.round(v);const perDay=totalDays>0?total/totalDays:0;const perKm=lineKm>0?total/lineKm:0;
+  /* ---------- 1. scope against the ITT ---------- */
+  if(itt.areaKm2){const d=(areaKm2-itt.areaKm2)/itt.areaKm2*100;
+    qcAdd(Math.abs(d)<=10?'ok':Math.abs(d)<=25?'warn':'bad','Scope',`Area in the blocks ${d1(areaKm2)} km² vs ${d1(itt.areaKm2)} km² in the ITT (${d>0?'+':''}${Math.round(d)} %)`,Math.abs(d)>10?'Check that every survey area in the ITT has a block, and that the km² come from the client\'s polygons (drop the shapefile on Scope & line km).':'');}
+  else qcAdd('info','Scope',`No area figure read from the ITT to compare with the blocks (${d1(areaKm2)} km² in the tender)`,'Type the area on the ITT intake page or drop the client\'s polygons.');
+  if(itt.nAreas&&itt.nAreas!==S.blocks.length)qcAdd('warn','Scope',`The ITT describes ${itt.nAreas} survey area${itt.nAreas>1?'s':''} but the tender has ${S.blocks.length} block${S.blocks.length>1?'s':''}`,'Each area is priced on its own depth – split or merge the blocks so they match the ITT.');
+  if(itt.lineKm){const d=(lineKm-itt.lineKm)/itt.lineKm*100;qcAdd(Math.abs(d)<=15?'ok':'warn','Scope',`Line km ${d0(lineKm)} vs ${d0(itt.lineKm)} stated in the ITT (${d>0?'+':''}${Math.round(d)} %)`,Math.abs(d)>15?'The client\'s line km usually assume their own line spacing – check depth, opening angle and overlap per block.':'');}
+  /* deliverables that need a sensor */
+  const eq=c.eq.map(e=>e.id);const dl=(itt.deliverables+' '+itt.notes).toLowerCase();
+  [['sss',/side ?scan|sss|mosaic|contact list/,'side scan sonar'],['sbp',/sub-?bottom|sbp|seismic|isopach/,'sub-bottom profiler'],['mag',/magnetom|uxo|gradiometer/,'magnetometer'],['rov',/\brov\b|visual inspection|cable track|depth of burial/,'ROV']].forEach(([id,re,name])=>{
+    if(re.test(dl)&&!eq.includes(id))qcAdd('bad','Scope',`The ITT asks for something that needs the ${name}, which is not in the spread`,'Add it on Vessel & spread – it changes both the day rate and the processing hours.');});
+  /* ---------- 2. days ---------- */
+  const hoursDay=c.spreads[0]?c.spreads[0].hoursDay:24;
+  const survey=c.spreads.reduce((a,sp)=>a+sp.baseDays,0);
+  qcAdd('info','Days',`${d1(survey)} survey days → ${d1(totalDays)} days in field (weather ${d0(c.spreads[0]?c.spreads[0].weather:0)} %, allowances ${d1(c.addonDays||0)} d)`,`${d0(lineKm)} line km at ${d1(c.spreads[0]?c.spreads[0].hoursDay:0)} h/day.`);
+  {const depths=S.blocks.map(b=>num(b.depth)).filter(x=>x>0);const shallow=depths.length?Math.min(...depths):null;
+    if(shallow!=null&&itt.depthMin!=null&&shallow>itt.depthMin+2)qcAdd('warn','Days',`The shallowest block is priced at ${d1(shallow)} m but the ITT says the survey starts at ${d1(itt.depthMin)} m`,'Line spacing follows the shallow end – a block priced at its mean depth gives too few line km and too few days.');}
+  /* nearshore and offshore are two different jobs – vessel, hours per day and allowances */
+  if(c.near.lineKm>0&&c.off.lineKm>0&&c.spreads.length<2)qcAdd('bad','Days',`${d0(c.near.lineKm)} line km are nearshore (≤ ${R.nearshoreLimit} m) and ${d0(c.off.lineKm)} offshore, but the tender has one spread`,'Press "Add the nearshore spread" on Scope & line km – nearshore runs on Breeze, Mist, Star or Remote with its own day rate, 12 h day and weather allowance.');
+  else if(c.near.lineKm>0&&c.off.lineKm>0)qcAdd('ok','Days',`Split in two: ${d0(c.off.lineKm)} offshore line km and ${d0(c.near.lineKm)} nearshore (≤ ${R.nearshoreLimit} m)`,c.spreads.map(sp=>`${sp.name}: ${d1(sp.totalDays)} d on ${sp.V.name}, ${sp.hoursDay} h/day, weather ${d0(sp.weather)} %`).join(' · '));
+  if(c.infillKm>0)qcAdd('ok','Scope',`${d0(c.infillKm)} line km are multibeam infill between the side scan lines`,'In shallow water the multibeam swath is narrower than the side scan spacing – the extra passes are in the line km.');
+  if(S.blocks.some(b=>num(b.turns)>0||b.cross))qcAdd('info','Days','Line turns and/or cross lines are switched on for at least one block','The calculations spreadsheet has neither – keep them only when the client asks for cross lines.');
+  /* ---------- 3. price ---------- */
+  const m=S.spread.margin;const rep=(c.report/(c.total||1))*100;
+  qcAdd(m>=8?'ok':'warn','Price',`Margin ${d1(m)} % · lump sum ${money(total,cur,R.fx)} · ${money(perDay,cur,R.fx)} per day in field · ${money(perKm,cur,R.fx)} per line km`,m<8?'Below the 10 % the rate card is built on.':'');
+  if(c.mob<=0)qcAdd('bad','Price','No mobilisation is priced','Every campaign has at least transit and mob/demob.');
+  if(rep<3||rep>12)qcAdd('warn','Price',`Reporting is ${d1(rep)} % of the tender`,'Njord normally lands at 5 % – check the processing factor and the report post.');
+  if((S.proc.factor||0)<0.3&&lineKm>200)qcAdd('warn','Price',`Processing factor ${S.proc.factor} h per line km on ${d0(lineKm)} line km`,'Historic outcome is 0.25–0.9 h/line km (HI1729 0.26, HI1731 0.73, HI1732 0.89).');
+  /* ---------- Njord MCP: nature and Severa ---------- */
+  const mcp=await qcMcp();
+  if(!mcp){QC.src.noMcp=true;qcAdd('info','Njord MCP','Depth, weather and Severa checks need the Njord MCP connection (claude.ai version)','In the file copy only the checks above run.');}
+  else{
+    /* depth per block from EMODnet */
+    QC.status='EMODnet: depth of the blocks…';render();
+    for(let i=0;i<S.blocks.length&&i<6;i++){const b=S.blocks[i];const g=blockGeometry(b);if(!g)continue;
+      try{const r=mcpJson(await mcp.callTool(QC_SERVER,'njord_mean_depth',{geometry:g}));if(r.meanDepthM==null)continue;
+        QC.src.depth=QC.src.depth||[];QC.src.depth.push({block:b.name,...r});
+        const used=num(b.depth);const shallow=qcNum(r.minDepthM);
+        if(b.driver==='mbes'&&shallow!=null&&used>Math.max(shallow,1)*1.8&&used>shallow+3)
+          qcAdd('warn','Depth',`${b.name}: priced at ${d1(used)} m, EMODnet says ${d1(r.minDepthM)}–${d1(r.maxDepthM)} m (mean ${d1(r.meanDepthM)} m)`,'Split the block into depth zones (Scope & line km) or price it at the shallow end – otherwise the line spacing is too wide.');
+        else qcAdd('ok','Depth',`${b.name}: ${d1(used)} m against EMODnet ${d1(r.minDepthM)}–${d1(r.maxDepthM)} m (mean ${d1(r.meanDepthM)} m over ${d1(r.areaKm2)} km²)`,r.partial?'EMODnet was rate-limited – run the check again for a final figure.':'');
+        if(qcNum(r.areaKm2)&&b.mode==='area'&&num(b.area)>0){const d=(num(b.area)-r.areaKm2)/r.areaKm2*100;if(Math.abs(d)>15)qcAdd('warn','Scope',`${b.name}: ${d1(num(b.area))} km² in the tender, ${d1(r.areaKm2)} km² measured on the polygon`,'');}
+      }catch(e){QC.src.depthError=String(e&&(e.message||e.code)||e).slice(0,140);}}
+    /* weather climatology at the main block */
+    const pos=(S.blocks.find(b=>b.pos)||{}).pos||'';const pm=String(pos).match(/(-?\d+(?:[.,]\d+)?)\s*[, ]\s*(-?\d+(?:[.,]\d+)?)/);
+    if(pm){QC.status='Weather climatology…';render();
+      const lat=parseFloat(pm[1].replace(',','.')),lon=parseFloat(pm[2].replace(',','.'));
+      const hs=(c.spreads[0]&&/breeze|star|mist|remote/i.test(c.spreads[0].V.name))?0.5:1.5;
+      try{const r=mcpJson(await mcp.callTool(QC_SERVER,'njord_downtime',{lat,lon,hs_m:hs,wind_ms:12}));
+        QC.src.weather=r;const mi=qcMonthOf(I.start);const mrow=mi!=null&&(r.monthly||[]).find(x=>x.month===QC_MONTHS[mi]);
+        const climate=mrow?mrow.downtimePct:r.annualPct;const w=c.spreads[0]?c.spreads[0].weather:0;
+        const label=mrow?`${QC_MONTHS[mi]} (${I.start})`:'year round';
+        qcAdd(w>=climate?'ok':'warn','Weather',`Weather allowance ${d0(w)} % against ${d1(climate)} % downtime ${label} at Hs ${hs} m, wind 12 m/s (ERA5 ${r.record})`,w<climate?'The climatology is higher than the allowance – the days in field are optimistic for that window.':'');
+        if(mi!=null){const worst=(r.monthly||[]).slice().sort((a,b)=>b.downtimePct-a.downtimePct)[0];if(worst&&worst.downtimePct>climate+8)qcAdd('info','Weather',`Worst month at the site is ${worst.month} at ${d1(worst.downtimePct)} %`,'Useful when the client asks for a window later in the year.');}
+      }catch(e){QC.src.weatherError=String(e&&(e.message||e.code)||e).slice(0,140);}}
+    /* Severa: this tender and comparable projects */
+    QC.status='Severa: this tender and comparable projects…';render();
+    const no=String(S.tenderNo||R.nextTenderNo||'');
+    const own=no?await qcSevera(mcp,'visma_project',`project_no eq '${no}'`,3):[];
+    if(own.length){const p=own[0];QC.src.severa=p;
+      const val=qcNum(p.expected_value_sek);const totalSek=cur==='SEK'?total:total; /* the tender is calculated in SEK */
+      if(val){const d=(totalSek-val)/val*100;
+        qcAdd(Math.abs(d)<=15?'ok':'warn','Severa',`Severa ${no} "${p.name}" (${p.sales_status||p.status_name}, ${p.sales_person||'no owner'}): expected value ${d0(val)} kr vs ${d0(totalSek)} kr in this tender (${d>0?'+':''}${Math.round(d)} %)`,Math.abs(d)>15?'Update the sales case or check the calculation – the two should tell the same story on award.':'');}
+      else qcAdd('info','Severa',`Severa ${no} "${p.name}" – no expected value set`,'Set it when the tender goes out so the pipeline is right.');
+      const desc=String(p.description||'');const dkm=desc.match(/([\d\s.,]{2,9})\s*(?:line\s*km|km\s*line)/i);const dd=desc.match(/~?\s*(\d{1,3})\s*days?/i);const da=desc.match(/([\d.,]+)\s*km2/i);
+      if(da){const a=parseFloat(da[1].replace(',','.'));if(a>0){const d=(areaKm2-a)/a*100;if(Math.abs(d)>15)qcAdd('warn','Severa',`The Severa description says ${a} km², the blocks give ${d1(areaKm2)} km²`,'');}}
+      if(dkm){const k=parseFloat(dkm[1].replace(/[\s,]/g,''));if(k>50){const d=(lineKm-k)/k*100;qcAdd(Math.abs(d)<=15?'ok':'warn','Severa',`Line km ${d0(lineKm)} vs ${d0(k)} in the Severa description (${d>0?'+':''}${Math.round(d)} %)`,'');}}
+      if(dd){const days=+dd[1];if(days>0){const d=(totalDays-days)/days*100;qcAdd(Math.abs(d)<=20?'ok':'warn','Severa',`${d1(totalDays)} days in field vs ~${days} days in the Severa description (${d>0?'+':''}${Math.round(d)} %)`,'');}}
+      const bud=await qcSevera(mcp,'visma_project_budget',`project_no eq '${no}'`,2);
+      if(bud.length&&qcNum(+bud[0].budget_vessel_days)){const bd=+bud[0].budget_vessel_days;const d=(totalDays-bd)/bd*100;
+        qcAdd(Math.abs(d)<=20?'ok':'warn','Severa',`Budget in Severa ${d1(bd)} vessel days vs ${d1(totalDays)} in the tender (${d>0?'+':''}${Math.round(d)} %)`,'');}
+    }else if(no)qcAdd('info','Severa',`No Severa project ${no} yet`,'The number is claimed locally – create the sales case in Severa so the tender and the pipeline match.');
+    /* what earlier projects cost per day and per line km – the outcome of everything Njord has priced */
+    QC.status='Severa: earlier projects…';render();
+    {const year=new Date().getFullYear();const rows=await qcSevera(mcp,'visma_project',`created_at ge ${year-1}-01-01T00:00:00Z and expected_value_sek ne null`,40);
+      const past=rows.filter(p=>p.project_no!==no&&qcNum(p.expected_value_sek)>0&&p.description).map(qcParseDesc).filter(x=>x.days>0);
+      const mine=c.eq.map(e=>e.id);const like=past.filter(x=>x.sensors.length&&x.sensors.filter(k=>mine.includes(k)).length>=Math.min(2,mine.length));
+      const use=(like.length>=3?like:past);
+      if(use.length>=3){const perDay=use.map(x=>x.value/x.days).sort((a,b)=>a-b);const med=perDay[Math.floor(perDay.length/2)];
+        const lo=perDay[Math.floor(perDay.length*0.15)],hi=perDay[Math.floor(perDay.length*0.85)];const mineDay=totalDays>0?total/totalDays:0;
+        QC.src.bench={n:use.length,med,lo,hi,like:like.length};
+        qcAdd(mineDay>=lo&&mineDay<=hi?'ok':'warn','Severa',`${d0(mineDay)} kr per day in field against ${d0(med)} kr median from ${use.length} earlier ${like.length>=3?'comparable ':''}project${use.length===1?'':'s'} (${d0(lo)}–${d0(hi)} kr)`,mineDay<lo?'Below what Njord normally gets per day – check the day rate, the allowances and the margin.':mineDay>hi?'Above the usual range – fine if the spread is heavier, worth a second look otherwise.':'');
+        const withKm=use.filter(x=>x.lineKm>50);
+        if(withKm.length>=3&&lineKm>0){const kmDay=withKm.map(x=>x.lineKm/x.days).sort((a,b)=>a-b);const kmed=kmDay[Math.floor(kmDay.length/2)];const mineKmDay=lineKm/Math.max(0.1,totalDays);
+          qcAdd(mineKmDay<=kmed*1.6?'ok':'warn','Severa',`${d0(mineKmDay)} line km per day in field against ${d0(kmed)} median from ${withKm.length} earlier projects`,mineKmDay>kmed*1.6?'Faster than Njord has ever delivered – check speed, hours per day and the weather allowance.':'');}
+      }else QC.src.benchThin=use.length;}
+    /* comparables: same client, and recent projects with a budget */
+    const client=String(S.client||'').replace(/'/g,"''");
+    if(client){const rows=await qcSevera(mcp,'visma_project',`contains(customer_name,'${client.split(/\s+/)[0]}') and expected_value_sek ne null`,20);
+      const past=rows.filter(p=>p.project_no!==no&&qcNum(p.expected_value_sek)>0);
+      if(past.length){QC.src.client=past.slice(0,8);
+        const vals=past.map(p=>p.expected_value_sek).sort((a,b)=>a-b);const med=vals[Math.floor(vals.length/2)];
+        qcAdd('info','Severa',`${past.length} earlier ${p0(client)} project${past.length>1?'s':''} in Severa – median value ${d0(med)} kr, this tender ${d0(total)} kr`,past.slice(0,4).map(p=>`${p.project_no} ${p.name} ${d0(p.expected_value_sek)} kr (${p.sales_status||''})`).join(' · '));}}
+  }
+  QC.at=new Date().toISOString();QC.busy=false;QC.status='';render();
+}
+const p0=s=>String(s||'').split(/\s+/)[0];
+function vQc(c){
+  const n=QC.rows.length;const bad=QC.rows.filter(r=>r.level==='bad').length,warn=QC.rows.filter(r=>r.level==='warn').length;
+  const badge=l=>l==='bad'?'<span class="badge crit">check</span>':l==='warn'?'<span class="badge warn">look</span>':l==='ok'?'<span class="badge good">ok</span>':'<span class="badge info">note</span>';
+  return `<div class="panel">
+    <div class="panel-h"><div><h2>QC – the tender against the ITT, the sea and Severa</h2><p>Reads the ITT figures, measures the blocks against EMODnet depths and the weather climatology at the site, and compares days and price with the sales case and earlier projects in Severa (Njord MCP). Nothing is changed – it only tells you what does not add up.</p></div><div class="row"><button class="btn primary" data-act="qc-run" ${QC.busy?'disabled':''}>${QC.busy?'Checking…':n?'Run the check again':'Run the check'}</button>${n?`<button class="btn sm" data-act="qc-copy">Copy as text</button>`:''}</div></div>
+    ${QC.busy?`<div class="note sea"><span class="spin"></span> ${esc(QC.status)}</div>`:''}
+    ${QC.error?`<div class="note warn">${esc(QC.error)}</div>`:''}
+    ${n?`<div class="row" style="gap:8px;margin-bottom:10px"><span class="badge ${bad?'crit':warn?'warn':'good'}">${bad?bad+' to check':warn?warn+' to look at':'nothing out of line'}</span><span class="hint" style="font-size:12px;color:var(--ink-3)">checked ${esc(QC.at.slice(0,16).replace('T',' '))}${QC.src.noMcp?' · without the Njord MCP connection':''}</span></div>
+    <div class="tblwrap"><table><thead><tr><th style="width:70px"></th><th style="width:90px">Area</th><th>What was compared</th></tr></thead><tbody>
+      ${QC.rows.map(r=>`<tr><td>${badge(r.level)}</td><td>${esc(r.area)}</td><td>${esc(r.text)}${r.detail?`<div style="font-size:11px;color:var(--ink-3);margin-top:2px">${esc(r.detail)}</div>`:''}</td></tr>`).join('')}
+    </tbody></table></div>`:`<div class="hint" style="font-size:13px;color:var(--ink-3)">The check compares: the blocks' area and line km with the ITT and the Severa sales case · the depth of every block with EMODnet · the weather allowance with the ERA5 climatology for the planned month at the site · days, price per day and price per line km with the Severa budget and earlier projects for the same client · sensors against what the ITT asks to be delivered.</div>`}
+  </div>`;}
+function qcText(){return [`QC ${S.tenderNo||''} ${S.client} – ${S.name}`,QC.at?`Checked ${QC.at.slice(0,16).replace('T',' ')}`:'',''].concat(QC.rows.map(r=>`[${r.level.toUpperCase()}] ${r.area}: ${r.text}${r.detail?' – '+r.detail:''}`)).join('\n');}
 </script>
 <script>
 /* =========================================================
@@ -1489,7 +1766,7 @@ const defaultRates=()=>({
     {job:'HI1728 – MCA LOT2, 5 346 line km, 1 315 h',factor:0.25},
     {job:'Calculations spreadsheet default (Hours/linekm)',factor:1.0},
   ],
-  tide:3.5, transducer:1.4,
+  tide:3.5, transducer:1.4, nearshoreLimit:10,
   hydroShare:70, mgmtShare:20,
   defaults:{margin:10,marginMethod:'price',weather:30,wxMethod:'share',mob:350000,reportPct:5,markup:10,prepHours:40,hseqHours:24,procFactor:1.0,hydro:70,mgmt:20,
     addons:[{name:'Transit',pct:10},{name:'Crew change',pct:4},{name:'Infills',pct:5},{name:'Breakdown',pct:4,base:'survey'},{name:'Mob/Demob',pct:5},{name:'Wreck',pct:0}]},
@@ -1571,6 +1848,8 @@ function load(){try{const j=JSON.parse(localStorage.getItem(KEY));if(j&&j.blocks
   const D=defaultState();for(const k of ['days','spread','proc','price'])s[k]=Object.assign({},D[k],s[k]||{});
   s.blocks=s.blocks.map(b=>Object.assign({},D.blocks[0],b));s.rates.procFactorHistory=D.rates.procFactorHistory;
   if(s.rates.kitDropbox==null)s.rates.kitDropbox=D.rates.kitDropbox;
+  if(s.rates.nearshoreLimit==null)s.rates.nearshoreLimit=D.rates.nearshoreLimit;
+  s.blocks.forEach(b=>{if(b.driver!=='mbes'&&b.driver!=='sss'&&b.driver!=='auto')b.driver='auto';});
   if(s.rates.tide==null)s.rates.tide=D.rates.tide;if(s.rates.transducer==null)s.rates.transducer=D.rates.transducer;if(!s.rates.repo)s.rates.repo=D.rates.repo;
   s.std=Object.assign({},D.std,s.std||{});s.ui=Object.assign({open:{}},s.ui||{});if(!s.tab)s.tab='std';
   if(!s.pkg.criteria)s.pkg.criteria=[];if(s.pkg.criteriaOn==null)s.pkg.criteriaOn=false;if(s.rev===undefined)s.rev=null;
@@ -1609,19 +1888,54 @@ const tabAllowed=t=>{const r=ROLES[S.role];return r.tabs==='all'||r.tabs.include
    effective depth = depth + tide − transducer; swath = 2·d·tan(angle/2); spacing = swath × (1 − overlap);
    line km = area ÷ spacing (+ cross lines 4·√area km); corridor = width ÷ spacing × length. */
 function blockCalc(b){
-  const R=S.rates;
-  let spacing=0,swath=0,effDepth=0;
-  if(b.driver==='mbes'){effDepth=Math.max(0.5,b.depth+num(R.tide)-num(R.transducer));swath=2*effDepth*Math.tan((b.angle/2)*Math.PI/180);spacing=swath*(1-b.overlap/100);}
-  else{swath=2*b.range;spacing=b.range*(2-b.ssOverlap/100);} /* 0 % overlap → 2·range, 100 % (full double coverage) → 1·range */
+  const R=S.rates;const sp=spreadOf(b)||{};const eqs=(sp.equipment||[]).slice();if(!eqs.includes('mbes'))eqs.push('mbes');
+  const has=id=>eqs.includes(id);
+  /* MBES: swath = 2 · effective depth · tan(angle/2); spacing = swath × (1 − overlap) */
+  const effDepth=Math.max(0.5,num(b.depth)+num(R.tide)-num(R.transducer));
+  const swathM=2*effDepth*Math.tan((num(b.angle)/2)*Math.PI/180);const spacingM=swathM*(1-num(b.overlap)/100);
+  /* SSS: swath = 2 × range; 0 % overlap → 2·range between lines, 100 % (full double coverage) → 1·range */
+  const swathS=2*num(b.range);const spacingS=num(b.range)*(2-num(b.ssOverlap)/100);
+  /* which sensor sets the line spacing – side scan when it is in the spread (SBP and MAG run on the same lines) */
+  const driver=b.driver==='mbes'?'mbes':b.driver==='sss'?'sss':(has('sss')?'sss':'mbes');
+  const swath=driver==='sss'?swathS:swathM;const forced=num(b.forceSpacing);
+  const spacing=forced>0?forced:(driver==='sss'?spacingS:spacingM);
   let rawKm=0,lines=0,crossKm=0;
-  if(b.mode==='area'){rawKm=spacing>0?b.area*1000/spacing:0;crossKm=b.cross?4*Math.sqrt(Math.max(0,b.area)):0;}
-  else if(b.mode==='corridor'){lines=spacing>0?Math.ceil(b.width/spacing):0;rawKm=lines*b.length/1000;}
-  else rawKm=b.lineKm;
-  const lineKm=(rawKm+crossKm)*(1+b.turns/100)*(num(b.complexity)||1);
-  const kmPerHour=b.speed*1.852;
-  return {swath,spacing,effDepth,rawKm,lines,crossKm,lineKm,kmPerHour,hours:kmPerHour>0?lineKm/kmPerHour:0};
+  if(b.mode==='area'){rawKm=spacing>0?num(b.area)*1000/spacing:0;lines=spacing>0&&num(b.width)>0?Math.ceil(num(b.width)/spacing):0;crossKm=b.cross?4*Math.sqrt(Math.max(0,num(b.area))):0;}
+  else if(b.mode==='corridor'){lines=spacing>0?Math.ceil(num(b.width)/spacing):0;rawKm=lines*num(b.length)/1000;}
+  else rawKm=num(b.lineKm);
+  /* MBES infill: in shallow water the multibeam swath is narrower than the side scan line spacing,
+     so extra passes are run between the main lines to reach 100 % multibeam coverage */
+  const infillPasses=(driver==='sss'&&has('mbes')&&spacingM>0&&spacing>spacingM)?Math.ceil(spacing/spacingM)-1:0;
+  const infillKm=rawKm*infillPasses;
+  const mainKm=rawKm;
+  const lineKm=(rawKm+infillKm+crossKm)*(1+num(b.turns)/100)*(num(b.complexity)||1);
+  const kmPerHour=num(b.speed)*1.852;
+  const near=num(b.depth)<=num(R.nearshoreLimit||10);
+  return {swath,spacing,effDepth,rawKm,mainKm,infillKm,infillPasses,lines,crossKm,lineKm,kmPerHour,driver,forced,spacingM,spacingS,swathM,swathS,sensors:eqs,near,hours:kmPerHour>0?lineKm/kmPerHour:0};
 }
 function spreadOf(b){return S.spreads.find(s=>s.id===b.spread)||S.spreads[0];}
+const isNear=b=>num(b.depth)<=num(S.rates.nearshoreLimit||10);
+/* the nearshore part (≤ 10 m by default) gets its own spread and vessel; every block is assigned by its depth */
+function splitSpreads(){
+  const R=S.rates;const nearBlocks=S.blocks.filter(isNear),offBlocks=S.blocks.filter(b=>!isNear(b));
+  const kindOf=id=>(R.vessels.find(v=>v.id===id)||{}).kind||'';
+  const NEAR_IDS=['breeze','mist','star','remote'];
+  if(!nearBlocks.length&&!offBlocks.length)return;
+  if(!nearBlocks.length){toast('No block is nearshore – nothing to split');return;}
+  let offSp=S.spreads.find(sp=>kindOf(sp.vessel)==='Offshore')||S.spreads[0];
+  let nearSp=S.spreads.find(sp=>sp!==offSp&&NEAR_IDS.includes(sp.vessel));
+  if(!offBlocks.length){/* everything is nearshore */
+    if(!NEAR_IDS.includes(offSp.vessel)){offSp.vessel='breeze';offSp.mode='near12';offSp.hours=12;}
+    offSp.name='Nearshore spread';S.blocks.forEach(b=>b.spread=offSp.id);
+    toast('All blocks are nearshore – the spread runs on '+((R.vessels.find(v=>v.id===offSp.vessel)||{}).name||offSp.vessel));save();render();return;}
+  if(!nearSp){nearSp=newSpread('nearshore');nearSp.equipment=[...(offSp.equipment||['mbes'])];nearSp.vessel='breeze';nearSp.mode='near12';nearSp.hours=12;S.spreads.push(nearSp);}
+  /* the offshore spread must be an offshore vessel on a 24 h day */
+  if(kindOf(offSp.vessel)!=='Offshore'){const deep=Math.max(...offBlocks.map(b=>num(b.depth)));offSp.vessel=deep>=30?'gale':'storm';offSp.mode='off24';offSp.hours=24;}
+  nearBlocks.forEach(b=>b.spread=nearSp.id);offBlocks.forEach(b=>b.spread=offSp.id);
+  nearSp.name='Nearshore spread';offSp.name='Offshore spread';
+  const nm=id=>(R.vessels.find(v=>v.id===id)||{}).name||id;
+  toast(`${offBlocks.length} offshore block${offBlocks.length===1?'':'s'} on ${nm(offSp.vessel)} (${offSp.hours} h/day), ${nearBlocks.length} nearshore on ${nm(nearSp.vessel)} (${nearSp.hours} h/day) – check the weather allowance for each spread on Days in field`);
+  save();render();}
 function newSpread(kind){
   const R=S.rates,d=R.defaults,first=S.spreads[0]||{};const off=kind==='offshore';
   return {id:uid(S.spreads),name:off?'Offshore spread':'Nearshore spread',vessel:off?'gale':'breeze',fuelType:first.fuelType||'MGO',equipment:[...(first.equipment||['mbes'])],mode:off?'off24':'near12',hours:off?24:12,weather:num(d.weather),crewChanges:null,extras:[],mob:num(d.mob),demobAuto:true,demob:num(d.mob)/2,alts:off?['storm']:[]};
@@ -1635,7 +1949,9 @@ function calcSpread(sp,bl,up){
   const w=num(sp.weather)/100;
   const weatherDays=S.days.wxMethod==='share'?(w<1?baseDays/(1-w)-baseDays:0):baseDays*w;
   const opWx=baseDays+weatherDays;
-  const addons=S.days.addons.map(a=>{const base=(a.base||S.days.addonBase)==='survey'?baseDays:opWx;return {...a,days:base*a.pct/100};});
+  /* allowance percentages: the tender's own, or a per-spread override (nearshore and offshore often differ) */
+  const own=Array.isArray(sp.addons)&&sp.addons.length?sp.addons:null;
+  const addons=S.days.addons.map((a,i)=>{const pct=own&&own[i]!=null&&own[i]!==''?num(own[i]):num(a.pct);const base=(a.base||S.days.addonBase)==='survey'?baseDays:opWx;return {...a,pct,days:base*pct/100};});
   const addonDays=addons.reduce((a,x)=>a+x.days,0);
   const totalDays=baseDays+weatherDays+addonDays, opDays=totalDays-weatherDays;
   const eq=R.equipment.filter(e=>e.included||(sp.equipment||[]).includes(e.id));
@@ -1661,6 +1977,13 @@ function calc(){
   const blocks=S.blocks.map(b=>({b,c:blockCalc(b)}));
   const lineKm=blocks.reduce((a,x)=>a+x.c.lineKm,0);
   const surveyHours=blocks.reduce((a,x)=>a+x.c.hours,0);
+  /* nearshore is the shallow part (chart depth ≤ the nearshore limit, 10 m by default) – priced with the nearshore spread */
+  const zone=k=>({lineKm:blocks.filter(x=>x.c.near===(k==='near')).reduce((a,x)=>a+x.c.lineKm,0),
+    areaKm2:blocks.filter(x=>x.c.near===(k==='near')).reduce((a,x)=>a+(x.b.mode==='area'?num(x.b.area):x.b.mode==='corridor'?num(x.b.width)*num(x.b.length)/1e6:0),0),
+    hours:blocks.filter(x=>x.c.near===(k==='near')).reduce((a,x)=>a+x.c.hours,0),
+    blocks:blocks.filter(x=>x.c.near===(k==='near')).length});
+  const near=zone('near'),off=zone('off');
+  const infillKm=blocks.reduce((a,x)=>a+x.c.infillKm,0);
   const spreads=S.spreads.map(sp=>calcSpread(sp,blocks.filter(x=>spreadOf(x.b).id===sp.id),up));
   const sum=k=>spreads.reduce((a,x)=>a+x[k],0);
   const baseDays=sum('baseDays'),weatherDays=sum('weatherDays'),addonDays=sum('addonDays'),totalDays=sum('totalDays'),opDays=sum('opDays');
@@ -1686,7 +2009,7 @@ function calc(){
   const reportSuggested=subtotal*num(R.defaults.reportPct)/100;
   const report=S.price.reportAuto?reportSuggested:S.price.report;
   const total=subtotal+report;
-  return {blocks,lineKm,surveyHours,baseDays,weatherDays,addons,addonDays,totalDays,opDays,spreads,vessels,
+  return {near,off,infillKm,blocks,lineKm,surveyHours,baseDays,weatherDays,addons,addonDays,totalDays,opDays,spreads,vessels,
     V,eq,eqCost:s0.eqCost,fuelPrice:s0.fuelPrice,fuelCost:s0.fuelCost,crewCost:s0.crewCost,officeCost:s0.officeCost,extraDay:s0.extraDay,extraLump,costOp:s0.costOp,costWx:s0.costWx,rateOp:s0.rateOp,rateWx:s0.rateWx,up,
     nChanges,changeCost:s0.changeCost,crewChangeTotal,fieldOp,fieldWx,mob,demob,procHours,hydroH,geoH,mgmtH,hRate,processing,prep,hseq,
     extras,extrasTotal,subtotal,reportSuggested,report,total,m};
@@ -1836,7 +2159,7 @@ function stdPreview(){
 }
 function buildStandard(){
   const st=S.std,R=S.rates,{rec,d,v,V,alts,mode,v2,V2,nearDepth}=stdPreview();
-  const keep={rates:R,rateLog:S.rateLog,user:S.user,userEmail:S.userEmail,role:S.role,std:st,ui:S.ui};const files=S.itt.files.slice();const itt0={...S.itt};
+  const keep={rates:R,rateLog:S.rateLog,user:S.user,userEmail:S.userEmail,role:S.role,std:st,ui:S.ui};const files=S.itt.files.slice();const itt0={...S.itt};const polyBlocks=(S.blocks||[]).filter(b=>b.poly||b.zone||b.geo); /* blocks measured from the client's polygons survive a rebuild */
   S=applyDefaults(defaultState(),R);Object.assign(S,keep);
   S.itt.mode=itt0.mode||'itt';S.itt.source=itt0.source||'write';S.itt.basedOn=itt0.basedOn||null;S.itt.read=itt0.read||null;S.itt.text=itt0.text||'';S.itt.textFiles=itt0.textFiles||[];S.itt.country=itt0.country||'';S.itt.tenderFolder=itt0.tenderFolder||'';S.itt.areas=Array.isArray(itt0.areas)?itt0.areas:[];
   const client=(st.client||'Client').trim();
@@ -1853,16 +2176,20 @@ function buildStandard(){
   if(S.itt.mode==='itt'&&S.itt.read&&Array.isArray(S.itt.read.equipment)&&S.itt.read.equipment.length){const eqs=S.itt.read.equipment.filter(e=>['sss','sbp','mag','rov','gaps'].includes(e));if(eqs.some(e=>['sss','rov','mag'].includes(e))&&!eqs.includes('gaps'))eqs.push('gaps');S.spreads.forEach(sp=>sp.equipment=[...eqs]);}
   if(!v2)S.spreads[0].name='Survey spread';
   const blk=(id,name,shape,size,depth,sp)=>({id,name,mode:shape==='corridor'?'corridor':shape==='km'?'km':'area',area:shape==='area'?size:0,width:num(st.width)||rec.width||500,length:shape==='corridor'?Math.round(size*1000):0,lineKm:shape==='km'?size:0,
-    driver:rec.driver,depth,angle:130,overlap:rec.overlap??20,range:rec.range??75,ssOverlap:rec.ssOverlap??100,speed:rec.speed,turns:10,cross:shape==='area',complexity:1,pos:st.pos||'',spread:sp});
+    driver:'auto',forceSpacing:0,depth,angle:130,overlap:rec.overlap??20,range:rec.range??75,ssOverlap:rec.ssOverlap??100,speed:rec.speed,turns:0,cross:false,complexity:1,pos:st.pos||'',spread:sp}); /* line km = area ÷ spacing, as in the calculations spreadsheet – turns and cross lines are options */
   const mainSize=st.shape==='area'?num(st.area):st.shape==='corridor'?num(st.length):num(st.lineKm);
   const areas=S.itt.mode==='itt'?(S.itt.areas||[]).filter(a=>a.area_km2>0||a.length_km>0||a.line_km>0):[];
   if(areas.length){/* one block per survey area in the ITT */
     S.blocks=areas.map((a,i)=>{const shape=a.kind==='corridor'?'corridor':a.kind==='lines'?'km':'area';const size=shape==='area'?a.area_km2:shape==='corridor'?a.length_km:a.line_km;
       const depth=a.depthMax>0?Math.round(((a.depthMin||0)+a.depthMax)/2)||d.depth:(a.nearshore?nearDepth:d.depth);const sp=a.nearshore&&v2?2:1;
       const b=blk(i+1,`Block ${i+1} – ${a.name||rec.block}`,shape,size,depth,sp);if(a.width_m>0)b.width=a.width_m;
-      if(Array.isArray(a.sensors)&&a.sensors.includes('sss')&&!a.sensors.includes('mbes'))b.driver='sss';return b;});}
+      if(a.lineSpacingM>0)b.forceSpacing=a.lineSpacingM;b.driver='auto';return b;});}
   else{S.blocks=[blk(1,`Block 1 – ${rec.block}`,st.shape,mainSize,d.depth,1)];
     if(v2)S.blocks.push(blk(2,'Block 2 – Landfall / nearshore part',st.shape==='km'?'km':st.shape,num(st.nearSize)||(st.shape=='area'?3:2),nearDepth,2));}
+  if(polyBlocks.length){S.blocks=polyBlocks.map((b,i)=>Object.assign(b,{id:i+1,spread:1,driver:b.driver||'auto'}));}
+  S.blocks.forEach(b=>{if(b.driver!=='mbes'&&b.driver!=='sss')b.driver='auto';});
+  /* the ITT's nearshore areas get their own spread and vessel (nearshore = chart depth ≤ the nearshore limit) */
+  if(S.blocks.some(isNear)&&S.blocks.some(b=>!isNear(b)))splitSpreads();
   S.proc.factor=rec.factor;S.price.currency=st.currency||'SEK';S.price.extras=[];S.pkg.deviations=[];S.pkg.appx=null;
   if(S.tenderNo==null||!st.keepNo){const n=Math.round(num(st.tenderNo||R.nextTenderNo));S.tenderNo=n;if(n>=R.nextTenderNo){const old=R.nextTenderNo;R.nextTenderNo=n+1;S.rateLog.push({t:new Date().toISOString(),path:'rates.nextTenderNo',label:'Next tender number (claimed '+n+' by standard tender)',old,new:n+1,who:S.user||ROLES[S.role].label});}}
   st.built=new Date().toISOString();st.keepNo=true;st.tenderNo=S.tenderNo;
@@ -2108,6 +2435,7 @@ function vScope(c){
   return `
   <div class="panel">
     <div class="panel-h"><div><h2>Survey blocks</h2><p>Name each block the way it will appear in the tender – "Block 1", "UXO corridor", "HI 7025" – and give it an area or a fixed line-km figure. Line spacing comes from the sensor that drives coverage.</p></div><button class="btn sea sm" data-act="block-add">+ Add block</button></div>
+    <div class="drop" data-drop="geo" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><b>Survey polygons from the ITT</b> – drop the client's shapefile zip (.shp + .prj + .dbf), KML/KMZ or GeoJSON here: one block per polygon with its measured km², length and mean width; then <b>Depth from EMODnet</b> reads the mean depth and <b>Split into depth zones</b> prices it as nearshore / intermediate / deep rows like the calculations spreadsheet.</div><label class="btn sm" style="cursor:pointer">Choose polygon files<input id="geofiles" type="file" accept=".zip,.kmz,.kml,.geojson,.json,.shp,.dbf,.prj" multiple hidden></label></div>${GEO.busy?`<div class="hint" style="font-size:12px;margin-top:6px"><span class="spin"></span> ${esc(GEO.status)}</div>`:''}${GEO.error?`<div class="hint" style="font-size:12px;color:var(--crit);margin-top:6px">${esc(GEO.error)}</div>`:''}</div>
     ${S.itt.mode==='itt'&&(S.itt.areas||[]).length?`<div class="note sea" style="margin-bottom:10px"><b>${S.itt.areas.length} block${S.itt.areas.length>1?'s':''} from the ITT's survey areas</b> – ${S.itt.areas.map(a=>esc(a.name)+(/estimat/i.test(a.notes||'')?' (size estimated)':'')).join(', ')}. Check the km² / corridor length against the ITT drawings and adjust below; add or remove blocks as needed.</div>`:S.itt.mode==='itt'&&S.itt.read?`<div class="note warn" style="margin-bottom:10px">The ITT reading found no separate survey areas – one block with the total size. If the ITT has several areas or lots, add a block per area here (or press "Read the ITT again" on the ITT intake page).</div>`:''}
     <div class="stack">
     ${c.blocks.map(({b,c:k},i)=>`
@@ -2116,31 +2444,40 @@ function vScope(c){
           <div style="flex:1"><input class="bare" style="font-family:var(--display);font-size:18px;font-weight:600;width:100%;border:0;border-bottom:1px dashed var(--line);background:none;padding:2px 0" data-path="blocks.${i}.name" value="${esc(b.name)}"></div>
           <div class="row">${S.spreads.length>1?`<span class="badge lock">${esc((S.rates.vessels.find(v=>v.id===spreadOf(b).vessel)||{}).name||'')}</span>`:''}<span class="badge info">${d0(k.lineKm)} line km</span><span class="badge lock">${d1(k.hours)} h survey</span>${c.blocks.length>1?`<button class="btn x" data-act="block-rm" data-i="${i}">✕</button>`:''}</div>
         </div>
+        ${b.geo||b.zone||b.depthInfo?`<div class="hint" style="font-size:12px;color:var(--ink-3);margin:-4px 0 10px">${b.geo?`Polygon ${esc(b.geo.file||'')}: <b>${b.geo.areaKm2} km²</b>, ${b.geo.lengthKm} km long × ${d0(b.geo.widthM)} m mean width${b.geo.corridor?' (corridor)':''}${b.geo.crs?' · '+esc(b.geo.crs):''}. `:''}${b.zone?`Depth zone ${b.zone.lo}–${b.zone.hi>1000?'':b.zone.hi} m: <b>${b.zone.share} %</b> of ${esc(b.zone.of)} – priced at the shallow quarter of its ${b.zone.samples} EMODnet samples (mean ${b.zone.mean} m). `:''}${b.depthInfo?`EMODnet: mean <b>${b.depthInfo.mean} m</b> below LAT, ${b.depthInfo.min}–${b.depthInfo.max} m over ${b.depthInfo.areaKm2} km² (${b.depthInfo.samples} samples, ${b.depthInfo.at})${b.depthInfo.partial?' – partial, check again':''}. `:''}${b.poly||b.pos?`<button class="btn sm" data-act="block-depth" data-i="${i}" ${GEO.busy?'disabled':''}>Depth from EMODnet</button> `:''}${b.poly?`<button class="btn sm" data-act="block-zones" data-i="${i}" ${GEO.busy?'disabled':''}>Split into depth zones</button>`:''}</div>`:''}
         <div class="grid g4">
           ${Field('Input',Sel(`blocks.${i}.mode`,b.mode,[['area','Area (km²)'],['corridor','Corridor (width × length)'],['km','Line km (given)']]))}
           ${b.mode==='area'?Field('Area',N(`blocks.${i}.area`,b.area,'km²','step="0.1"')):b.mode==='corridor'?Field('Corridor width',N(`blocks.${i}.width`,b.width,'m')):Field('Line kilometres',N(`blocks.${i}.lineKm`,b.lineKm,'km'))}
-          ${b.mode==='corridor'?Field('Corridor length',N(`blocks.${i}.length`,b.length,'m')):Field('Coverage driven by',Sel(`blocks.${i}.driver`,b.driver,[['mbes','Multibeam (depth & angle)'],['sss','Side scan (range)']]))}
+          ${b.mode==='corridor'?Field('Corridor length',N(`blocks.${i}.length`,b.length,'m')):Field('Line spacing from',Sel(`blocks.${i}.driver`,b.driver,[['auto','Automatic – side scan when it is in the spread'],['mbes','Multibeam (depth & angle)'],['sss','Side scan (range)']]),`${k.driver==='sss'?'Side scan':'Multibeam'} sets the spacing${k.infillPasses?` · ${k.infillPasses} multibeam infill pass${k.infillPasses>1?'es':''} between the lines`:''}`)}
           ${Field('Survey speed',N(`blocks.${i}.speed`,b.speed,'kn','step="0.1"'))}
         </div>
         <div class="grid g4" style="margin-top:10px">
-          ${b.mode==='corridor'?Field('Coverage driven by',Sel(`blocks.${i}.driver`,b.driver,[['mbes','Multibeam (depth & angle)'],['sss','Side scan (range)']])):''}
-          ${b.driver==='mbes'?Field('Water depth (chart)',N(`blocks.${i}.depth`,b.depth,'m'),(()=>{const d=depthSuggest(b.pos,S.itt.location);return `+ ${S.rates.tide} m tide − ${S.rates.transducer} m transducer = ${d1(k.effDepth)} m · ${d?`<a href="#" data-act="depth-suggest" data-i="${i}" style="color:var(--sea)">suggest ${d.typ} m (${esc(d.name)})</a> · `:''}<a href="https://njord-vessel-map.web.app" target="_blank" rel="noopener" style="color:var(--sea)">Vessel Map ↗</a>`;})()):Field('Side scan range',N(`blocks.${i}.range`,b.range,'m'))}
-          ${b.driver==='mbes'?Field('Opening angle (total)',N(`blocks.${i}.angle`,b.angle,'°'),'Spreadsheet uses 65° half-angle = 130°'):Field('Overlap between lines',N(`blocks.${i}.ssOverlap`,b.ssOverlap,'%'),'100 % = full 200 % coverage')}
-          ${b.driver==='mbes'?Field('Overlap between lines',N(`blocks.${i}.overlap`,b.overlap,'%')):''}
+          ${b.mode==='corridor'?Field('Line spacing from',Sel(`blocks.${i}.driver`,b.driver,[['auto','Automatic – side scan when it is in the spread'],['mbes','Multibeam (depth & angle)'],['sss','Side scan (range)']]),`${k.driver==='sss'?'Side scan':'Multibeam'} sets the spacing${k.infillPasses?` · ${k.infillPasses} multibeam infill pass${k.infillPasses>1?'es':''} between the lines`:''}`):''}
+          ${Field('Water depth (chart)',N(`blocks.${i}.depth`,b.depth,'m'),(()=>{const d=depthSuggest(b.pos,S.itt.location);return `${k.near?'<b>nearshore</b>':'<b>offshore</b>'} (limit ${S.rates.nearshoreLimit} m) · + ${S.rates.tide} m tide − ${S.rates.transducer} m transducer = ${d1(k.effDepth)} m · ${d?`<a href="#" data-act="depth-suggest" data-i="${i}" style="color:var(--sea)">suggest ${d.typ} m (${esc(d.name)})</a> · `:''}<a href="https://njord-vessel-map.web.app" target="_blank" rel="noopener" style="color:var(--sea)">Vessel Map ↗</a>`;})())}
+          ${k.driver==='sss'?Field('Side scan range',N(`blocks.${i}.range`,b.range,'m'),`swath ${d0(k.swathS)} m`):Field('Opening angle (total)',N(`blocks.${i}.angle`,b.angle,'°'),'Spreadsheet uses 65° half-angle = 130°')}
+          ${k.driver==='sss'?Field('Side scan overlap',N(`blocks.${i}.ssOverlap`,b.ssOverlap,'%'),'100 % = full 200 % coverage'):Field('Multibeam overlap',N(`blocks.${i}.overlap`,b.overlap,'%'))}
           ${Field('Line turns',N(`blocks.${i}.turns`,b.turns,'%'))}
         </div>
         <div class="grid g4" style="margin-top:10px">
           ${b.mode==='area'?Field('Cross lines',`<label class="row" style="gap:6px;font-size:13px;padding:8px 0"><input type="checkbox" data-path="blocks.${i}.cross" ${b.cross?'checked':''}> 4 × √area = ${d1(k.crossKm)} km</label>`):''}
+          ${Field('Line spacing from the ITT',N(`blocks.${i}.forceSpacing`,b.forceSpacing||0,'m'),k.forced>0?'The ITT sets the spacing – 0 = calculate it from the sensors':'0 = calculated from the sensors above')}
           ${Field('Complexity factor',N(`blocks.${i}.complexity`,b.complexity,'×','step="0.05"'),'1.0 = normal seabed')}
           ${Field('Position (lat, lon)',T(`blocks.${i}.pos`,b.pos||'','57.70, 11.60'),'Centre of the block – drives the depth suggestion')}
           ${S.spreads.length>1?Field('Spread / vessel',Sel(`blocks.${i}.spread`,spreadOf(b).id,S.spreads.map(sp=>[sp.id,`${sp.name} · ${(S.rates.vessels.find(v=>v.id===sp.vessel)||{}).name||sp.vessel}`])),'Which vessel surveys this block'):''}
         </div>
-        <div class="formula" style="margin-top:10px">${b.driver==='mbes'?`swath = 2 × ${d1(k.effDepth)} m × tan(${b.angle}°/2) = ${d1(k.swath)} m → spacing = swath × (1 − ${b.overlap} %) = <b>${d1(k.spacing)} m</b>`:`spacing = range ${b.range} m × (2 − ${b.ssOverlap} %) = <b>${d1(k.spacing)} m</b>`} · ${b.mode==='area'?`${b.area} km² ÷ ${d1(k.spacing)} m = ${d0(k.rawKm)} km${b.cross?` + ${d1(k.crossKm)} km cross`:''}`:b.mode==='corridor'?`${b.width} m ÷ ${d1(k.spacing)} m = ${k.lines} lines × ${b.length} m = ${d0(k.rawKm)} km`:`${b.lineKm} km`} + ${b.turns} % turns × ${b.complexity} = ${d0(k.lineKm)} km · ${b.speed} kn = ${d1(k.kmPerHour)} km/h → ${d1(k.hours)} survey hours</div>
+        <div class="formula" style="margin-top:10px">${k.forced>0?`line spacing from the ITT = <b>${d1(k.spacing)} m</b>`:k.driver==='sss'?`side scan spacing = range ${b.range} m × (2 − ${b.ssOverlap} %) = <b>${d1(k.spacing)} m</b>`:`multibeam swath = 2 × ${d1(k.effDepth)} m × tan(${b.angle}°/2) = ${d1(k.swath)} m → spacing = swath × (1 − ${b.overlap} %) = <b>${d1(k.spacing)} m</b>`} · ${b.mode==='area'?`${b.area} km² ÷ ${d1(k.spacing)} m = ${d0(k.mainKm)} km`:b.mode==='corridor'?`${b.width} m ÷ ${d1(k.spacing)} m = ${k.lines} lines × ${d1(num(b.length)/1000)} km = ${d0(k.mainKm)} km`:`${d0(k.mainKm)} line km given`}${k.infillPasses?` · multibeam swath here is only ${d1(k.spacingM)} m → ${k.infillPasses} infill pass${k.infillPasses>1?'es':''} = + ${d0(k.infillKm)} km`:''}${b.cross?` + ${d1(k.crossKm)} km cross`:''}${num(b.turns)?` + ${b.turns} % turns`:''}${(num(b.complexity)||1)!==1?` × ${b.complexity}`:''} = <b>${d0(k.lineKm)} km</b> · ${b.speed} kn${(k.sensors||[]).filter(x=>x!=='gaps').length>1?` · ${(k.sensors||[]).filter(x=>x!=='gaps').map(x=>SHORT[x]||x).join(' + ')} on the same lines`:''}</div>
       </div>`).join('')}
     </div>
   </div>
   <div class="panel">
     <div class="spread"><h3>Total scope</h3><div class="row"><span class="big" style="font-size:28px;color:var(--navy)">${d0(c.lineKm)} line km</span><span class="badge lock">${d0(c.surveyHours)} survey hours</span></div></div>
+    <div class="grid g4" style="margin-top:10px">
+      <div class="sect"><h4>Nearshore (≤ ${S.rates.nearshoreLimit} m)</h4><p style="margin:2px 0 0;font-size:15px"><b>${d0(c.near.lineKm)}</b> line km · ${d1(c.near.areaKm2)} km² · ${c.near.blocks} block${c.near.blocks===1?'':'s'}</p><div class="src">${d1(c.near.hours)} survey hours</div></div>
+      <div class="sect"><h4>Offshore (&gt; ${S.rates.nearshoreLimit} m)</h4><p style="margin:2px 0 0;font-size:15px"><b>${d0(c.off.lineKm)}</b> line km · ${d1(c.off.areaKm2)} km² · ${c.off.blocks} block${c.off.blocks===1?'':'s'}</p><div class="src">${d1(c.off.hours)} survey hours</div></div>
+      <div class="sect"><h4>Multibeam infill</h4><p style="margin:2px 0 0;font-size:15px"><b>${d0(c.infillKm)}</b> line km</p><div class="src">Extra passes where the multibeam swath is narrower than the side scan spacing</div></div>
+      <div class="sect"><h4>Spreads</h4><p style="margin:2px 0 0;font-size:15px">${c.spreads.map(sp=>`${esc(sp.name)}: <b>${d1(sp.totalDays)}</b> d`).join('<br>')}</p><div class="src">Days in field per spread – see Days in field</div></div>
+    </div>
+    ${c.near.lineKm>0&&c.spreads.length<2?`<div class="note warn" style="margin-top:12px"><div class="row" style="justify-content:space-between;gap:12px;flex-wrap:wrap"><div><b>${d0(c.near.lineKm)} line km are nearshore (≤ ${S.rates.nearshoreLimit} m)</b> but the tender has one spread. Nearshore blocks are surveyed by Northern Breeze, Mist, Star or Remote, with their own day rate, hours per day and weather allowance.</div><button class="btn primary sm" data-act="split-spreads">Add the nearshore spread and move those blocks</button></div></div>`:''}
   </div>`;
 }
 
@@ -2166,18 +2503,19 @@ function vDays(c){
     </div>
   </div>
   <div class="panel">
-    <div class="panel-h"><div><h2>Allowances</h2><p>The calculations spreadsheet treats weather as a share of total time and puts the allowances on top of survey + weather days (breakdown on survey days only). The percentages apply to every spread.</p></div><button class="btn sea sm" data-act="addon-add">+ Add allowance</button></div>
+    <div class="panel-h"><div><h2>Allowances</h2><p>The calculations spreadsheet treats weather as a share of total time and puts the allowances on top of survey + weather days (breakdown on survey days only). The % column is the tender's default; with a nearshore and an offshore spread each vessel has its own column – transit and crew change are rarely the same inshore as offshore.</p></div><button class="btn sea sm" data-act="addon-add">+ Add allowance</button></div>
     <div class="grid g2">
       ${Field('Weather method',Sel('days.wxMethod',D.wxMethod,[['share','Share of total time (spreadsheet: P ÷ (1 − w))'],['addon','Add-on % of survey days (30 d + 50 % = 45 d)']]))}
       ${Field('Allowances based on',Sel('days.addonBase',D.addonBase,[['opwx','Survey + weather days (spreadsheet)'],['survey','Survey days only']]))}
     </div>
     <div class="tblwrap" style="margin-top:14px"><table>
       <thead><tr><th>Allowance</th><th class="r" style="width:110px">%</th><th style="width:180px">Base</th>${multi?c.spreads.map(x=>`<th class="r" style="width:110px">${esc(x.V.name.replace('Northern ','N. '))}</th>`).join(''):''}<th class="r" style="width:100px">Days</th><th style="width:40px"></th></tr></thead>
-      <tbody>${c.addons.map((a,i)=>`<tr><td><input class="bare" data-path="days.addons.${i}.name" value="${esc(a.name)}"></td><td class="r">${N(`days.addons.${i}.pct`,a.pct,'%')}</td><td>${Sel(`days.addons.${i}.base`,a.base||'',[['','Default'],['opwx','Survey + weather'],['survey','Survey days']])}</td>${multi?c.spreads.map(x=>`<td class="r num" style="color:var(--ink-3)">${d1(x.addons[i].days)}</td>`).join(''):''}<td class="r num">${d1(a.days)}</td><td><button class="btn x" data-act="addon-rm" data-i="${i}">✕</button></td></tr>`).join('')}</tbody>
+      <tbody>${c.addons.map((a,i)=>`<tr><td><input class="bare" data-path="days.addons.${i}.name" value="${esc(a.name)}"></td><td class="r">${N(`days.addons.${i}.pct`,a.pct,'%')}</td><td>${Sel(`days.addons.${i}.base`,a.base||'',[['','Default'],['opwx','Survey + weather'],['survey','Survey days']])}</td>${multi?c.spreads.map((x,si)=>`<td class="r">${N(`spreads.${si}.addons.${i}`,(S.spreads[si].addons&&S.spreads[si].addons[i]!=null&&S.spreads[si].addons[i]!=='')?S.spreads[si].addons[i]:a.pct,'%')}<div style="font-size:10px;color:var(--ink-3)">${d1(x.addons[i]?x.addons[i].days:0)} d</div></td>`).join(''):''}<td class="r num">${d1(a.days)}</td><td class="r">${c.addons.length>1?`<button class="btn x" data-act="addon-rm" data-i="${i}">✕</button>`:''}</td></tr>`).join('')}</tbody>
     </table></div>
   </div>
   <div class="panel">
     <h3>Days in field</h3>
+    ${multi?`<div class="grid g4" style="margin:6px 0 14px">${c.spreads.map(x=>`<div class="sect"><h4>${esc(x.name)} · ${esc(x.V.name)}</h4><p style="margin:2px 0 0;font-size:15px"><b>${d1(x.totalDays)}</b> days in field</p><div class="src">${d0(x.lineKm)} line km · ${d1(x.baseDays)} survey + ${d1(x.weatherDays)} weather + ${d1(x.addonDays)} allowances · ${x.hoursDay} h/day</div></div>`).join('')}<div class="sect"><h4>Total</h4><p style="margin:2px 0 0;font-size:15px"><b>${d1(c.totalDays)}</b> vessel days</p><div class="src">${d1(c.opDays)} operating · ${d1(c.weatherDays)} waiting on weather${c.spreads.length>1?' – the spreads can work in parallel':''}</div></div></div>`:''}
     ${c.spreads.map(x=>`${multi?`<div class="eyebrow" style="margin-top:12px">${esc(x.name)} · ${esc(x.V.name)} · ${d1(x.totalDays)} days</div>`:''}${bar(x)}`).join('')}
     <div class="kpis" style="grid-template-columns:repeat(3,1fr);max-width:560px">
       <div class="kpi"><div class="v big">${d1(c.totalDays)}</div><div class="l">Total days</div></div>
@@ -2311,6 +2649,7 @@ function vPrice(c){
       ${[['10','Contract signing'],['10','Mobilisation'],['60','During operations'],['10','Raw data delivered'],['10','Final report']].map(p=>`<div><div class="p">${p[0]} %</div><div class="l">${p[1]}</div><div class="v">${kr(c.total*p[0]/100)}</div></div>`).join('')}
     </div>
   </div>
+  ${vQc(c)}
   <div class="panel">
     <div class="panel-h"><div><h3>Budget to Severa</h3><p>The same fields as the "TO SEVERA" sheet in the calculations spreadsheet – copied into the project budget on award.</p></div><button class="btn sm" data-act="severa-copy">Copy as text</button></div>
     <div class="tblwrap"><table id="severa"><tbody>
@@ -2521,6 +2860,7 @@ function vRates(c){
       ${Field('Crew change interval',cell('rates.crewInterval',R.crewInterval,'days'))}
       ${Field('Standstill at crew change',cell('rates.standstillHours',R.standstillHours,'h'))}
       ${Field('Tide allowance on chart depth',cell('rates.tide',R.tide,'m'),'Spreadsheet: depth + 3.5 m')}
+      ${Field('Nearshore limit',cell('rates.nearshoreLimit',R.nearshoreLimit,'m'),'Blocks at this chart depth or shallower are nearshore – Breeze, Mist, Star or Remote')}
       ${Field('Transducer depth',cell('rates.transducer',R.transducer,'m'),'Spreadsheet: 1.4 / 2.4 / 3.4 m by vessel')}
     </div>
   </div>
@@ -2838,7 +3178,7 @@ document.addEventListener('click',e=>{
   if(a==='review-mark'){const sec=S.rates.sections[i];const old=sec.reviewed;sec.reviewed=new Date().toISOString().slice(0,10);S.rateLog.push({t:new Date().toISOString(),path:`rates.sections.${i}.reviewed`,label:'Section reviewed · '+sec.title,old,new:sec.reviewed,who:S.user||ROLES[S.role].label});render();return;}
   if(a==='review-ask'){const sec=S.rates.sections[i];reviewSend(sec,false);return;}
   const actions={
-    'block-add':()=>S.blocks.push({id:uid(S.blocks),name:'Block '+(S.blocks.length+1),mode:'area',area:5,width:500,length:10000,driver:'mbes',depth:20,angle:130,overlap:20,range:75,ssOverlap:100,lineKm:0,speed:4.5,turns:10,cross:true,complexity:1,spread:S.spreads[0].id}),
+    'block-add':()=>S.blocks.push({id:uid(S.blocks),name:'Block '+(S.blocks.length+1),mode:'area',area:5,width:500,length:10000,driver:'mbes',depth:20,angle:130,overlap:20,range:75,ssOverlap:100,lineKm:0,speed:4.5,turns:0,cross:false,complexity:1,spread:S.spreads[0].id}),
     'block-rm':()=>S.blocks.splice(i,1),
     'addon-add':()=>S.days.addons.push({id:uid(S.days.addons),name:'Wreck search',pct:5}),
     'addon-rm':()=>S.days.addons.splice(i,1),
@@ -2848,11 +3188,16 @@ document.addEventListener('click',e=>{
     'sx-add':()=>{const sp=S.spreads[+b.dataset.s]||S.spreads[0];sp.extras.push({id:uid(sp.extras),name:'',perDay:0,lump:0});},
     'sx-rm':()=>{const sp=S.spreads[+b.dataset.s]||S.spreads[0];sp.extras.splice(i,1);},
     'spread-add':()=>{S.spreads.push(newSpread(b.dataset.kind));toast('Spread added – assign its blocks under Scope');},
+    'split-spreads':()=>{splitSpreads();},
     'spread-rm':()=>{if(S.spreads.length<2)return;const gone=S.spreads.splice(i,1)[0];S.blocks.forEach(x=>{if(x.spread===gone.id)x.spread=S.spreads[0].id;});},
     'factor':()=>S.proc.factor=num(b.dataset.v),
     'cur':()=>{S.price.currency=b.dataset.cur;if(S.std)S.std.currency=b.dataset.cur;},
     'letter-write':()=>{letterWrite();},
     'kit-dropbox':()=>{kitFromDropbox();},
+    'block-depth':()=>{blockDepth(i);},
+    'qc-run':()=>{qcRun();},
+    'qc-copy':()=>{navigator.clipboard.writeText(qcText()).then(()=>toast('QC copied')).catch(()=>toast('Could not copy'));},
+    'block-zones':()=>{blockSplitZones(i);},
     'letter-std':()=>{S.pkg.letter=letterStandard().join('\n\n');S.pkg.letterBy='the standard text, '+new Date().toISOString().slice(0,10);},
     'letter-clear':()=>{S.pkg.letter='';S.pkg.letterBy='';},
     'px-add':()=>S.price.extras.push({id:uid(S.price.extras),name:'',cost:0,markup:10}),
@@ -2904,10 +3249,11 @@ document.addEventListener('click',e=>{
   if(actions[a]){actions[a]();render();}
 });
 function docsToast(n,next){const parts=[];if(n.docs||DOCS.count)parts.push(DOCS.template?DOCS.count+' documents, template found':DOCS.count+' documents – Client Proposal template not found, the built-in copy is used');if(n.tenders||DOCS.tenders.size)parts.push(DOCS.tenders.size+' tender folders'+(next?', next number '+next:''));return parts.length?parts.join(' · '):'Nothing useful found in that folder';}
-function ittAttach(fl){if(!fl.length)return;const ff=ittFolderFiles(fl);fl=ff.files;if(ff.folder&&applyTenderFolder(ff.folder))toast('Tender folder '+ff.folder+' – number '+S.tenderNo+' and short names taken from it');for(const f of fl){const ext=(f.name.split('.').pop()||'').toUpperCase().slice(0,5);if(!S.itt.files.some(x=>x.name===(f.webkitRelativePath||f.name)))S.itt.files.push({name:f.webkitRelativePath||f.name,ext,size:f.size>1e6?(f.size/1e6).toFixed(1)+' MB':Math.round(f.size/1e3)+' kB'});}S.itt.mode='itt';render();ittReadFiles(fl);}
+const GEO_FILE=/\.(zip|kmz|kml|geojson|json|shp|dbf|prj)$/i;
+function ittAttach(fl){if(!fl.length)return;const geo=fl.filter(f=>GEO_FILE.test(f.name)&&!/tender_data\.json$/i.test(f.name));if(geo.length){geoImport(geo);fl=fl.filter(f=>!geo.includes(f));if(!fl.length)return;}const ff=ittFolderFiles(fl);fl=ff.files;if(ff.folder&&applyTenderFolder(ff.folder))toast('Tender folder '+ff.folder+' – number '+S.tenderNo+' and short names taken from it');for(const f of fl){const ext=(f.name.split('.').pop()||'').toUpperCase().slice(0,5);if(!S.itt.files.some(x=>x.name===(f.webkitRelativePath||f.name)))S.itt.files.push({name:f.webkitRelativePath||f.name,ext,size:f.size>1e6?(f.size/1e6).toFixed(1)+' MB':Math.round(f.size/1e3)+' kB'});}S.itt.mode='itt';render();ittReadFiles(fl);}
 document.addEventListener('dragover',e=>{const z=e.target.closest&&e.target.closest('[data-drop]');if(z){e.preventDefault();z.classList.add('over');}});
 document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('[data-drop]');if(z)z.classList.remove('over');});
-document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest('[data-drop]');if(!z)return;e.preventDefault();z.classList.remove('over');const fl=[...(e.dataTransfer&&e.dataTransfer.files||[])];if(z.dataset.drop==='itt')ittAttach(fl);});
+document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest('[data-drop]');if(!z)return;e.preventDefault();z.classList.remove('over');const fl=[...(e.dataTransfer&&e.dataTransfer.files||[])];if(z.dataset.drop==='itt')ittAttach(fl);else if(z.dataset.drop==='geo')geoImport(fl);});
 document.addEventListener('change',e=>{
   const el=e.target;
   if(el.dataset.doc){S.pkg.docs[el.dataset.doc]=el.checked;render();return;}
@@ -2924,6 +3270,7 @@ document.addEventListener('change',e=>{
   if(el.id==='mallfolder'||el.id==='mallfolder2'){const n=docsLoad([...el.files]);el.value='';render();docsCacheSave().then(k=>{if(k)render();});docsTenderNo().then(next=>{render();if(GEN.pending&&docsTemplate()){GEN.pending=false;generatePackage(GEN.ownPdf);return;}toast(docsToast(n,next));});return;}
   if(el.id==='ownpdf'){const f=el.files&&el.files[0];el.value='';if(f)genStart(f);return;}
   if(el.id==='malltpl'||el.id==='mallpdfs'||el.id==='mallpdfs2'){const fl=[...el.files];el.value='';if(!fl.length)return;const n=docsLoad(fl);render();docsCacheSave().then(k=>{if(k)render();});if(GEN.pending&&docsTemplate()){GEN.pending=false;generatePackage(GEN.ownPdf);return;}toast(el.id==='malltpl'?(DOCS.template?'Template ready – now press Generate package':'That file is not the Client Proposal template (Njord_Survey_Client_Proposal_TEMPLATE.docx)'):fl.length+' appendix PDF'+(fl.length>1?'s':'')+' added – '+docsStatus().text);return;}
+  if(el.id==='geofiles'){const fl=[...el.files];el.value='';if(fl.length)geoImport(fl);return;}
   if(el.id==='ittfiles'||el.id==='ittfiles2'||el.id==='ittfiles3'){const fl=[...el.files];ittAttach(fl);el.value='';return;}
   if(el.dataset.path){
     if(/^spreads\.\d+\.crewChanges$/.test(el.dataset.path)&&el.value===''){S.spreads[+el.dataset.path.split('.')[1]].crewChanges=null;render();}
@@ -3051,8 +3398,7 @@ $g('gate-lock').addEventListener('click',e=>{e.preventDefault();try{localStorage
 </script>
 
 <script>
-/* file copy: no Microsoft 365 identity or team database on this copy – team password and this browser's storage apply */
-(function(){var f=document.querySelector('.rail .foot');if(f)f.insertAdjacentHTML('afterbegin','<b>File copy 2026-09-08 · v2.2</b> · ');})();
+(function(){var f=document.querySelector('.rail .foot');if(f)f.insertAdjacentHTML('afterbegin','<b>File copy 2026-09-09 · v2.5</b> · ');})();
 </script>
 </body>
 </html>
